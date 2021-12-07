@@ -1,0 +1,495 @@
+#!/bin/vbash
+
+#
+# EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
+# Version v1.0-20211207
+# ^-- previous line is used for version identification, dont remove this line!
+#
+# Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
+#
+# Works on all EdgeRouter and EdgePoint devices (EdgeOS versions 1.9.0+ and 2.0+)
+#
+
+cfgusrdir="/config/user-data/"
+wgdir="${cfgusrdir}wireguard/"
+wgsettings="${wgdir}wgsettings.json"
+wgsetupscriptfile="/config/scripts/post-config.d/wireguard_setup.sh"
+wgautoupdatecronjob="/etc/cron.daily/wireguard_autoupdate"
+log="${wgdir}wireguard-wizard.log"
+wgpkgapi="https://api.github.com/repos/WireGuard/wireguard-vyatta-ubnt/releases/latest"
+wgwizapi="https://api.github.com/repos/vchrizz/ER-wizard-WireGuard/releases/latest"
+
+#
+# DO NOT EDIT BELOW HERE !
+#
+
+ACTION=$1
+INPUT=$2
+
+# vyatta configuration node for wireguard
+wgcfg="interfaces wireguard"
+
+cmd=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
+run=/opt/vyatta/bin/vyatta-op-cmd-wrapper
+cli=cli-shell-api
+
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >>$log
+
+#function to write setup-script
+writesetupscript () {
+    cat >$wgsetupscriptfile <<'ENDSCRIPTCONTENT'
+#!/bin/bash
+cfgusrdir="/config/user-data/"
+wgdir="${cfgusrdir}wireguard/"
+log="${wgdir}/wireguard-wizard-setup.log"
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running WireGuard setup script ..." >$log
+wireguardwizard=""
+for i in $(find /config/wizard/feature/ -name wizard-run); do
+    if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] WireGuard wizard found at $(dirname $i)" >>$log
+        wireguardwizard=$i
+        break
+    fi
+done
+if [ ! -f $wireguardwizard ]; then
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: WireGuard wizard not found!" >>$log
+    exit
+fi
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running install function from wizard ... " >>$log
+$wireguardwizard install >>$log
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] install function done." >>$log
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running apply function from wizard ... " >>$log
+if [ -s "$wgdir/wgsettings.json" ]; then
+    chown -R root:vyattacfg /opt/vyatta/config/active/*
+    sg vyattacfg -c "$wireguardwizard apply ${wgdir}wgsettings.json" >>$log
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Settings from ${wgdir}wgsettings.json applied." >>$log
+else
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: ${wgdir}wgsettings.json does not exist or has zero size!" >>$log
+fi
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] apply function done." >>$log
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Finished WireGuard setup script..." >>$log
+exit 0
+ENDSCRIPTCONTENT
+    chmod +x $wgsetupscriptfile
+}
+
+writecronjob () {
+    cat >$wgautoupdatecronjob <<'ENDSCRIPTCONTENT'
+#!/bin/bash
+cfgusrdir="/config/user-data/"
+wgdir="${cfgusrdir}wireguard/"
+log="${wgdir}/wireguard-wizard-autoupdate.log"
+rm -f $wgdir/*.deb
+source /config/scripts/post-config.d/wireguard_setup.sh
+exit 0
+ENDSCRIPTCONTENT
+    chmod +x $wgautoupdatecronjob
+}
+
+installwireguard () {
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Starting installation of WireGuard from $wgdir ..."
+    mkdir -p $wgdir
+    cd $wgdir
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] check if we are online (if we can reach github.com) ..."
+    onlinecheck="false"
+    ping -w1 -c1 github.com >/dev/null
+    if [ $? == 0 ]; then
+        onlinecheck="true"
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] online-check succeeded ..."
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] online-check failed ..."
+    fi
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Check system where we are running ..."
+    edgerouterhw=$(/usr/sbin/ubnt-hal-e getBoardIdE | sed 's/[0-9]$/0/')
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Detected EdgeRouter $edgerouterhw system ..."
+    edgeosversion=$(/usr/sbin/ubnt-hal show-version | awk '/Version/{split($2,v,".");print v[1];exit}')
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Detected EdgeOS version $edgeosversion ..."
+    pkgvariant="$edgerouterhw-$edgeosversion"
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Checking for $pkgvariant deb-file in $(pwd) ..."
+    for file in $(find $wgdir -name ${pkgvariant}*.deb); do
+        if [[ "$file" =~ /${pkgvariant}*.deb/ ]]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] File $pkgvariant deb-file in $(pwd) found: $file ..."
+            wgpackage=$file
+            break
+        fi
+    done
+    if [ "$1" == "forceupgrade" ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] -> Forced upgrade from wizard ..."
+        if [ "$onlinecheck" == "true" ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] We are online, remove ${pkgvariant} deb-file and download new one ..."
+            rm -f ${wgdir}/${pkgvariant}*.deb
+        fi
+    fi
+    if [ ! -f ${pkgvariant}*.deb ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file not found, need to download from latest release ..."
+        if [ "$onlinecheck" == "true" ]; then
+            curl -sLo /tmp/wgwizlatest ${wgwizapi}
+            wizurl=$(jq -r '.assets[].browser_download_url' /tmp/wgwizlatest)
+            curl -sLo /tmp/wgpkglatest ${wgpkgapi}
+            pkgurl=$(jq -r '.assets[].browser_download_url | select(test("'$pkgvariant'"))' /tmp/wgpkglatest)
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of Wizard starting from $wizurl ..."
+            curl -sLO $wizurl
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of WireGuard starting from $pkgurl ..."
+            curl -sLO $pkgurl
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
+        else
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Error: we are not online, can not download. Missing deb-file. Exit."
+            exit 1
+        fi
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file $pkgvariant found in $(pwd) ..."
+    fi
+    if [ -f ER-wizard-WireGuard.tar ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] -> Upgrading Wizard ..."
+        wireguardwizard=""
+        for i in $(find /config/wizard/feature/ -name wizard-run); do
+            if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
+                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] WireGuard wizard found at $i" >>$log
+                wireguardwizard=$i
+                break
+            fi
+        done
+        tar -C $(dirname $wireguardwizard) -xf ER-wizard-WireGuard.tar
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Wizard upgrade done..."
+    fi
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..." 
+    dpkg -i ${pkgvariant}*.deb
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installation done."
+}
+
+# function called when you click the wizard
+load () {
+
+    ###########################
+    # WireGuard LOAD function #
+    ###########################
+
+    [ ! -d $wgdir ] && mkdir -p $wgdir
+
+    wireguardwizard=""
+    for i in $(find /config/wizard/feature/ -name wizard-run); do
+        if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] WireGuard wizard found at $i" >>$log
+            wireguardwizard=$i
+            break
+        fi
+    done
+
+    # try to install wireguard and show status (with version information if installed)
+    pkgstatus="\"pkgstatus\":\"error: not installed.\""
+    dpkg -l wireguard >>$log 2>>$log
+    if [ $? != 0 ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] wireguard package not installed! need to install packages." >>$log
+        installwireguard >>$log 2>>$log
+        if [ $? == 0 ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] wireguard package installed and configured. all done." >>$log
+            pkgstatus="\"pkgstatus\":\"success: running wireguard installation ... completed.\""
+        else
+            pkgstatus="\"pkgstatus\":\"error: not installed, download or install problem. check $log\""
+        fi
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] wireguard package already installed! checking for new version on disk ..." >>$log
+        # check if latest version is installed from packages available in $cfgusrdir
+        version_installed=$(dpkg -l wireguard | awk '/ii/ { print $3 }')
+        version_latest=$(curl -s ${wgpkgapi} | jq -r .tag_name)
+        dpkg --compare-versions $version_latest gt $version_installed
+        if [ $? == 0 ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] new wireguard package found: $version_latest" >>$log
+            pkgstatus="info: wireguard $version_installed installed. new version found: $version_latest"
+        else
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] latest available wireguard package is already installed: $version_installed (found in $wgdir)" >>$log
+            pkgstatus="success: wireguard $version_installed installed."
+        fi
+        pkgstatus="\"pkgstatus\":\"$pkgstatus\""
+    fi
+
+    # get wireguard process status if unning
+    procstatus=$(ps x | grep -v awk | awk '/wg/ { print $1" "$5 }' | sed ':a;N;$!ba;s/\n/ /g')
+    if [ -z "$procstatus" ]; then
+        procstatus="not running"
+    fi
+    procstatus="\"procstatus\":\"$procstatus\""
+
+    # get wizard update status
+    wizupdatestatus=$(awk '/Version/{print $3;exit}' $wireguardwizard)
+    if [ -z "$wizupdatestatus" ]; then
+        wizupdatestatus="not available"
+    fi
+    wizupdatestatus="\"wizupdatestatus\":\"$wizupdatestatus\""
+
+    # setup-config script in case of firmware upgrade
+    wgsetupscript='"wgsetupscript":""'
+    if [ -w $wgsetupscriptfile ]; then
+        wgsetupscript='"wgsetupscript":"on"'
+    fi
+
+    # auto-upgrade cronjob script
+    autoupdatefromgithub='"autoupdatefromgithub":""'
+    if [ -w $wgautoupdatecronjob ]; then
+        autoupdatefromgithub='"autoupdatefromgithub":"on"'
+    fi
+
+    #
+    # Read current configuration
+    #
+
+    # Checkbox "Enable"
+    wgenable="\"wgenable\":false"
+    eval "interfaces=($($cli listActiveNodes interfaces wireguard))"
+    if [ "${interfaces[0]}" == "wg0" ]; then wgenable="\"wgenable\":\"on\""; fi
+
+    # Inputfield "Server Port"
+    eval "listenport=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} listen-port))"
+    listenport="\"listen-port\":\"$listenport\""
+
+    # Checkbox "Route allowed IPs" (default value: true)
+    routeallowedips=""
+    routeallowedips_vyatta=$($cli returnActiveValue interfaces wireguard ${interfaces[0]} route-allowed-ips)
+    if [ -n "$routeallowedips_vyatta" ] && [ $routeallowedips_vyatta == "true" ]; then
+        routeallowedips="on"
+    fi
+
+    # (disabled) Inputfield "My public key"
+    eval "privatekey=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} private-key))"
+    if [ -n "$privatekey" ]; then
+        localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
+    fi
+    localpubkey="\"localpubkey\":\"$localpubkey\""
+
+    # (hidden) Inputfield "private key"
+    privatekey="\"privatekey\":\"$privatekey\""
+
+    # Peers:
+    # get current wireguard configuration and return configured values to wizard.html
+    peerlist=''
+    eval "peers=($($cli listActiveNodes $wgcfg ${interfaces[0]} peer))"
+    for peer in "${peers[@]}"; do
+        if [ -n "$peerlist" ]; then
+            peerlist+=",{\"public-key\":\"$peer\""
+        else
+            peerlist="{\"public-key\":\"$peer\""
+        fi
+        eval "settings=($($cli listActiveNodes $wgcfg ${interfaces[0]} peer $peer))"
+        for setting in "${settings[@]}"; do
+            if [ "$setting" == "allowed-ips" ]; then
+                allowedips=''
+                eval "values=($($cli returnActiveValues $wgcfg ${interfaces[0]} peer $peer allowed-ips))"
+                for value in "${values[@]}"; do
+                    [ -n "$allowedips" ] && allowedips+=','
+                    allowedips+="\"$value\""
+                done
+                [ -n "$allowedips" ] && allowedips="\"allowed-ips\":[$allowedips]" && peerlist+=",$allowedips"
+            fi
+            if [ "$setting" == "description" ]; then
+                eval "description=($($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer description))"
+                [ -n "$description" ] && description="\"description\":\"$description\"" && peerlist+=",$description"
+            fi
+            if [ "$setting" == "endpoint" ]; then
+                eval "endpoint=($($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer endpoint))"
+                [ -n "$endpoint" ] && endpoint="\"endpoint\":\"$endpoint\"" && peerlist+=",$endpoint"
+            fi
+            if [ "$setting" == "persistent-keepalive" ]; then
+                eval "persistentkeepalive=($($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer persistent-keepalive))"
+                [ -n "$persistentkeepalive" ] && persistentkeepalive="\"persistent-keepalive\":\"$persistentkeepalive\"" && peerlist+=",$persistentkeepalive"
+            fi
+            if [ "$setting" == "preshared-key" ]; then
+                eval "presharedkey=($($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer preshared-key))"
+                [ -n "$presharedkey" ] && presharedkey="\"preshared-key\":\"$presharedkey\"" && peerlist+=",$presharedkey"
+            fi
+        done
+        peerlist+='}'
+    done
+
+    #
+    # get all variables together for output
+    #
+    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizupdatestatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
+}
+
+# function called when you click apply
+apply () {
+
+    parse () {
+        local var=$1
+        local exp=$2
+        local val=$(cat $INPUT | jq "$exp" 2>/dev/null)
+        if [ $(expr index "$exp" []) -eq 0 ]; then
+            eval "$var=$val"
+        else
+            eval "$var=($val)"
+        fi
+    }
+
+    # save applied settings
+    if [ ! "$INPUT" == "$wgsettings" ]; then
+        # if not saved within last 20 seconds
+        #if [ $(( $(date +%s) - $(stat $wgsettings -c %Y) )) -gt 20 ]; then
+            cp -f $INPUT $wgsettings
+        #fi
+    fi
+
+    # setup script
+    if [ "$(jq -M -r '.wgsetupscript' $INPUT 2>/dev/null)" == "on" ]; then
+        if [ ! -f $wgsetupscriptfile ]; then
+            writesetupscript
+        fi
+    else
+        rm -f $wgsetupscriptfile >/dev/null 2>/dev/null
+    fi
+
+    # manual upgrade trigger via wizard
+    [ "$(jq -M -r '.updatefromgithub' $INPUT)" == "on" ] && installwireguard forceupgrade >>$log 2>>$log
+
+    # auto-upgrade script
+    if [ "$(jq -M -r '.autoupdatefromgithub' $INPUT 2>/dev/null)" == "on" ]; then
+        if [ ! -f $wgautoupdatecronjob ]; then
+            writecronjob
+        fi
+    else
+        rm -f $wgautoupdatecronjob >/dev/null 2>/dev/null
+    fi
+
+    ############################
+    # WireGuard APPLY function #
+    ############################
+
+    local ret=0
+    local output=''
+    local -A name
+
+    parse wgenable '."wgenable"'
+    parse privatekey '."privatekey"'
+    if [ "$wgenable" == "on" ] && [ -z "$privatekey" ]; then
+        privatekey="$(wg genkey)"
+    fi
+    parse listenport '."listen-port"'
+    parse routeallowedips '."route-allowed-ips"'
+    parse pubkeys '."peerlist"[]."public-key"'
+    parse endpoints '."peerlist"[]."endpoint"'
+    parse presharedkeys '."peerlist"[]."preshared-key"'
+    parse persistentkeepalives '."peerlist"[]."persistent-keepalive"'
+    mapfile -t allowedips < <(cat $INPUT | jq -c '."peerlist"[]|select(has("public-key"))."allowed-ips"' | sed 's/,/ /g;s/\[//;s/\]//;s/\"//g')
+
+    for pubkey in "${pubkeys[@]}"; do
+        if [ -z "$pubkey" ] || [ "$pubkey" == null ]; then
+            continue
+        fi
+        if [ -n "${name[${pubkey,,}]}" ]; then
+            output="Public key <b>'${pubkey,,}'</b> exists more than once"
+            ret=1
+            break
+        fi
+        name[${pubkey,,}]=1
+    done
+
+    if [ $ret == 0 ]; then
+        temp=$(mktemp)
+        (
+            $cmd begin
+            ret=0
+            eval "interfaces=($($cli listActiveNodes $wgcfg))"
+            if [ -n "$interfaces" ]; then
+                #$cmd delete $wgcfg ${interfaces[0]} || ret=1
+                if ! $cmd delete $wgcfg ${interfaces[0]}; then
+                    echo "$cmd delete $wgcfg ${interfaces[0]} failed." >> $log
+                    ret=1
+                fi
+            fi
+            if [ "$wgenable" == "on" ]; then
+                interfaces="wg0"
+                if ! $cmd set $wgcfg ${interfaces[0]} private-key "${privatekey}"; then
+                    echo "set $wgcfg ${interfaces[0]} private-key \"${privatekey}\" failed." >> $log
+                    ret=1
+                fi
+                if [ -n "$listenport" ]; then
+                    if ! $cmd set $wgcfg ${interfaces[0]} listen-port "${listenport}"; then
+                        echo "set $wgcfg ${interfaces[0]} listen-port \"${listenport}\" failed." >> $log
+                        ret=1
+                    fi
+                fi
+                if [ "$routeallowedips" == "on" ]; then
+                    if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips true; then
+                        echo "set $wgcfg ${interfaces[0]} route-allowed-ips true failed." >> $log
+                        ret=1
+                    fi
+                fi
+                j=0
+                for ((i = 0; i < ${#pubkeys[@]}; i++)); do
+                    if [ -z "${pubkeys[i]}" ] || [ "${pubkeys[i]}" == null ]; then
+                        continue
+                    fi
+                    if [ -n "${endpoints[i]}" ]; then
+                        if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint "${endpoints[i]}"; then
+                            echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" endpoint \"${endpoints[i]}\" failed." >> $log
+                            ret=1
+                            break
+                        fi
+                    fi
+                    if [ -n "${persistentkeepalives[i]}" ]; then
+                        if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive "${persistentkeepalives[i]}"; then
+                            echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" persistent-keepalive \"${persistentkeepalives[i]}\" failed." >> $log
+                            ret=1
+                            break
+                        fi
+                    fi
+                    if [ -n "${presharedkeys[i]}" ]; then
+                        if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key "${presharedkeys[i]}"; then
+                            echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" preshared-key \"${presharedkeys[i]}\" failed." >> $log
+                            ret=1
+                            break
+                        fi
+                    fi
+                    if [ -n "${allowedips[j]}" ] && [ "${allowedips[j]}" != "null" ]; then
+                        for allowedip in ${allowedips[j]}; do
+                            if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips "$allowedip"; then
+                                echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" allowed-ips \"$allowedip\" failed." >> $log
+                                ret=1
+                                break 2
+                            fi
+                        done
+                    fi
+                    if [ $ret == 1 ]; then
+                        echo "something failed, check log!." >> $log
+                        break
+                    fi
+                    j=$(expr $j + 1)
+                done
+            fi
+        
+            if [ $ret == 0 ]; then
+                $cmd commit || ret=1
+            fi
+            if [ $ret == 0 ]; then
+                $cmd save || ret=1
+            fi
+            $cmd end
+            exit $ret
+        ) >$temp 2>&1
+        ret=$?
+
+        output=$(cat $temp)
+        rm -f $temp
+    fi
+
+    if [ $ret == 0 ]; then
+        echo "{\"success\":\"1\"}"
+    else
+        output=$(echo $output)
+        echo "{\"success\":\"0\",\"error\": \"${output//\"/\'}\"}"
+    fi
+
+}
+
+case "$ACTION" in
+    install)
+        installwireguard $2
+        ;;
+    load)
+        load
+        ;;
+    apply)
+        apply
+        ;;
+esac
+
+echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard ended - Session="$$ >>$log

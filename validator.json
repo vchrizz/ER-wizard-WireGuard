@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "listen-port": {
+      "required": false,
+      "number":1
+    },
+    "endpoint": {
+      "required": false
+    },
+    "public-key": {
+      "required": true
+    },
+    "preshared-key": {
+      "required": false
+    },
+    "persistent-keepalive": {
+      "required": false,
+      "number":1
+    },
+    "allowed-ips": {
+      "required": false
+    }
+  }
+}
