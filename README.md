@@ -19,6 +19,7 @@ To install the wizard in EdgeOS:
 - [2] Click the "+" next to Feature Wizards
 - [3a] Enter a name for the wizard, for example "WireGuard"
 - [3b] Upload latest ER-wizard-WireGuard.tar file from [releases](https://github.com/vchrizz/ER-wizard-WireGuard/releases/latest) in this repository
+- [3c] Click save
 - [4] Click the wizard
 
 ![Screenshot of ER-wizard-WireGuard Installation](https://github.com/vchrizz/ER-wizard-WireGuard/blob/main/ER-wizard-WireGuard-installation.png)
