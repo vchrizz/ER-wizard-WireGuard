@@ -7,10 +7,10 @@ Uses [WireGuard for Ubiquiti](https://github.com/WireGuard/wireguard-vyatta-ubnt
 - Display status of WireGuard package installation
 - Display status of running instances/processes
 - Display status of Wizard version
-- Setup script to install and configure WireGuard after a firmware upgrade
+- Setup script to install and configure WireGuard (with previous wg0 settings) after a firmware upgrade
 - Option to manual upgrade if auto-upgrade is disabled
 - Automatic upgrade with daily check for latest release of "ER-wizard-WireGuard" and "WireGuard for Ubiquiti"
-- Easy configuration of wg0 interface (does not modify any existing wg1-wg999 interfaces)
+- Easy configuration of wg0 interface (does not touch/modify/save any existing wg1-wg999 interfaces)
 
 ## Installation
 To install the wizard in EdgeOS:
