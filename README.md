@@ -11,6 +11,7 @@ Uses [WireGuard for Ubiquiti](https://github.com/WireGuard/wireguard-vyatta-ubnt
 - Option to manually upgrade if auto-upgrade is disabled
 - Automatic upgrade with daily check for latest release of "ER-wizard-WireGuard" and "WireGuard for Ubiquiti"
 - Easy configuration of wg0 interface (does not touch/modify/save any existing wg1-wg999 interfaces)
+- Generates private key automatically and displays public key in wizard
 
 ## Installation
 To install the wizard in EdgeOS:
