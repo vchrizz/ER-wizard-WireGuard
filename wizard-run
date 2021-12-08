@@ -360,7 +360,12 @@ apply () {
     parse wgenable '."wgenable"'
     parse privatekey '."privatekey"'
     if [ "$wgenable" == "on" ] && [ -z "$privatekey" ]; then
-        privatekey="$(wg genkey)"
+        # PROBLEM: EdgeOS WireGuard package has problems to handle private keys with slashes
+        # FIX: Generate private keys in a loop until one is generated without (forward) slashes
+        privatekey='/'
+        until [[ "$privatekey" != *\/* ]]; do
+            privatekey=$(wg genkey)
+        done
     fi
     parse listenport '."listen-port"'
     parse routeallowedips '."route-allowed-ips"'
