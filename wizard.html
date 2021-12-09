@@ -176,8 +176,8 @@ document.onchange=function(){
     } else if (pkgstatus.value.match(/^info/)) {
         pkgstatus.style.color = "orange";
     }
-    // enable manual update checkbox if package status shows 'new version available'
-    if (pkgstatus.value.match(/new version available/)) {
+    // enable manual update checkbox if package status shows 'new version found'
+    if (pkgstatus.value.match(/new version found/)) {
         document.getElementById('updatefromgithub').disabled = false;
     } else {
         document.getElementById('updatefromgithub').disabled = true;
