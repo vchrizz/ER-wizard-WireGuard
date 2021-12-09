@@ -64,7 +64,7 @@ div.wireguardlogo {
                 <table border=0 width="650px" cellspacing=0 cellpadding=0><tr><td>
                     <table border=0 width="450px"><tr>
                         <td style="vertical-align:middle">Remote endpoint: </td>
-                        <td><input name="endpoint" size="25" placeholder="server.example.org:51820" title="Remote server address with port" /></td>
+                        <td><input name="endpoint" size="30" placeholder="server.example.org:51820" title="Remote server address with port" /></td>
                     </tr><tr>
                         <td style="vertical-align:middle">Public key: </td>
                         <td><input name="public-key" size="45" placeholder="N/A" title="Remote public key (required)" /></td>
@@ -74,6 +74,9 @@ div.wireguardlogo {
                     </tr><tr>
                         <td style="vertical-align:middle">Keepalive: </td>
                         <td><input name="persistent-keepalive" size="2" placeholder="N/A" title="Persistent keepalive, for example: 25" /></td>
+                    </tr><tr>
+                        <td style="vertical-align:middle"><div><span class="text" data-infotip='Should be less than 5min typically.'>Latest handshake: </span></div></td>
+                        <td><input id="latesthandshake" name="latesthandshake" size="30" placeholder="N/A" title="Status: Latest handshake" /></td>
                     </tr><tr>
                         <td><button type="button" class="addable-remove">Remove peer</button></td>
                     </tr></table>
@@ -136,12 +139,16 @@ document.onchange=function(){
         input.style.color = "red";
     } else if (input.value.match(/up-to-date/)) {
         input.style.color = "green";
-    } 
+    }
     document.getElementById('wizupdatestatus').disabled = true;
     document.getElementById("updatefromgithub").disabled = true;
     var input = document.getElementById('pkgstatus');
     if(input.value.match(/new version found/)) {
         document.getElementById("updatefromgithub").disabled = false;
+    }
+    var latesthandshake = document.getElementById('latesthandshake')
+    if(latesthandshake != null) {
+        latesthandshake.disabled = true;
     }
 }
 document.onsubmit=function(){
