@@ -10,7 +10,8 @@ Uses [WireGuard for Ubiquiti](https://github.com/WireGuard/wireguard-vyatta-ubnt
 - Setup script to install and configure WireGuard (with previous wg0 settings) after a firmware upgrade
 - Option to manually upgrade if auto-upgrade is disabled
 - Automatic upgrade with daily check for latest release of "ER-wizard-WireGuard" and "WireGuard for Ubiquiti"
-- Generates private key automatically and displays public key in wizard
+- Generates private key automatically
+- Displays public key in wizard with option to show it as QRcode
 - Easy configuration of wg0 interface (does not touch/modify/save any existing wg1-wg999 interfaces)
 - Display latest handshake for each configured peer
 
