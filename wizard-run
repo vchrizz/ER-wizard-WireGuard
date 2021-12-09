@@ -2,7 +2,7 @@
 
 #
 # EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
-# Version v1.0-20211207
+# Version v1.3-20211209
 # ^-- previous line is used for version identification, dont remove this line!
 #
 # Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
@@ -211,11 +211,21 @@ load () {
     procstatus="\"procstatus\":\"$procstatus\""
 
     # get wizard update status
-    wizupdatestatus=$(awk '/Version/{print $3;exit}' $wireguardwizard)
-    if [ -z "$wizupdatestatus" ]; then
-        wizupdatestatus="not available"
+    wiz_installed=$(awk '/Version/{print $3;exit}' $wireguardwizard)
+    if [ -z "$wiz_installed" ]; then
+        wizstatus="not available"
+    else
+        wiz_latest=$(curl -s ${wgwizapi} | jq -r .tag_name)
+        dpkg --compare-versions $wiz_latest gt $wiz_installed
+        if [ $? == 0 ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] new wireguard wizard found: $wiz_latest" >>$log
+            wizstatus="info: wizard $wiz_installed installed. new version found: $wiz_latest"
+        else
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] latest available wireguard wizard is already installed: $wiz_installed (found in $wgdir)" >>$log
+            wizstatus="success: wizard $wiz_installed installed."
+        fi
     fi
-    wizupdatestatus="\"wizupdatestatus\":\"$wizupdatestatus\""
+    wizstatus="\"wizstatus\":\"$wizstatus\""
 
     # setup-config script in case of firmware upgrade
     wgsetupscript='"wgsetupscript":""'
@@ -307,7 +317,7 @@ load () {
     #
     # get all variables together for output
     #
-    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizupdatestatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeall                                                                 owedips\",$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
+    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
 }
 
 # function called when you click apply
