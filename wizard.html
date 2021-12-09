@@ -1,7 +1,12 @@
 <!--
 
-EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
-Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.0+ and 2.0+)
+#
+# EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
+#
+# Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
+#
+# Works on all EdgeRouter and EdgePoint devices (EdgeOS versions 1.9.0+ and 2.0+)
+#
 
 -->
 <style>
@@ -83,7 +88,7 @@ td#allowedips {
     <table border="0">
         <tr><td>Package Status:</td><td><input disabled id="pkgstatus" name="pkgstatus" type="text" size="80" disabled /></td></tr>
         <tr><td>Process Status:</td><td><input disabled name="procstatus" type="text" size="80" disabled /></td></tr>
-        <tr><td>Wizard Status:</td><td><input disabled name="wizupdatestatus" type="text" size="80" disabled /></td></tr>
+        <tr><td>Wizard Status:</td><td><input disabled id="wizstatus" name="wizstatus" type="text" size="80" disabled /></td></tr>
         <tr><td colspan="2"><div><span><input id="wgsetupscript" name="wgsetupscript" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='When updating the Firmware, WireGuard package gets lost (only data from /config/ directory will be copied over to newly installed system). Enable this Setup-Script to install and setup WireGuard after a firmware upgrade. WARNING: DO NOT remove WireGuard Wizard if Setup-Script is enabled because it uses functions from this Wizard for setup.'>Setup Script</span></div></td></tr>
         <tr><td colspan="2"><div><span><input id="updatefromgithub" name="updatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='When checked, the wizard will download and install the current version from github. During this process, wireguard will update and restart as well - this will interrupt current connections for a couple of seconds. You need to refresh the EdgeRouter WebUI afterwards, as the browser session will need a restart.'>Upgrade Wizard and WireGuard on 'Apply'.</span></div></td></tr>
         <tr><td colspan="2"><div><span><input id="autoupdatefromgithub" name="autoupdatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='When checked, a daily cronjob will check for a new version on Github and install it automatically. WARNING: DO NOT remove WireGuard Wizard if Auto-Upgrade is enabled because it uses functions from this Wizard for upgrade.'>Upgrade Wizard and WireGuard from <a href="https://github.com/vchrizz/ER-wizard-WireGuard/" target="_blank">GitHub</a> <b>automatically</b></span></div></td></tr>
@@ -167,8 +172,9 @@ function toggleQR() {
     }
 }
 document.onchange=function(){
-    // set colored text on package status
+    // set colored text on package and wizard status
     var pkgstatus = document.getElementById('pkgstatus');
+    var wizstatus = document.getElementById('wizstatus');
     if(pkgstatus.value.match(/^error/)) {
         pkgstatus.style.color = "red";
     } else if (pkgstatus.value.match(/^success/)) {
@@ -176,8 +182,15 @@ document.onchange=function(){
     } else if (pkgstatus.value.match(/^info/)) {
         pkgstatus.style.color = "orange";
     }
-    // enable manual update checkbox if package status shows 'new version found'
-    if (pkgstatus.value.match(/new version found/)) {
+    if(wizstatus.value.match(/^error/)) {
+        wizstatus.style.color = "red";
+    } else if (wizstatus.value.match(/^success/)) {
+        wizstatus.style.color = "green";
+    } else if (wizstatus.value.match(/^info/)) {
+        wizstatus.style.color = "orange";
+    }
+    // enable manual update checkbox if package or wizard status shows 'new version found'
+    if (pkgstatus.value.match(/new version found/) || wizstatus.value.match(/new version found/)) {
         document.getElementById('updatefromgithub').disabled = false;
     } else {
         document.getElementById('updatefromgithub').disabled = true;
