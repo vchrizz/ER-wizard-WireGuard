@@ -52,7 +52,7 @@ div.wireguardlogo {
     <div><span class="text" data-infotip="WireGuard Server Port - enables listen-port if set. Only required if you want to connect clients to this device.">Server Port</span></div><br>
     <span><input name="listen-port" size="5" placeholder="N/A" title="for example: 51820" /></span><br>
     <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled, must be set manually to 'false' in Config Tree if you really want to disable this option.">Route allowed IPs</span></div><br>
-    <div style="left:150px">My public key: <input id="localpubkey" name="localpubkey" placeholder="N/A" size="45" title="public wireguard key calculated from private key" disabled />
+    <div style="left:150px">My public key: <input style="font-family:courier" id="localpubkey" name="localpubkey" placeholder="N/A" size="45" title="public wireguard key calculated from private key" disabled />
         <input type="hidden" name="privatekey" />
     </div>
     <div class="clear"></div>
