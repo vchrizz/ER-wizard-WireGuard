@@ -3,6 +3,7 @@ WireGuard Wizard for Ubiquiti EdgeMAX Devices supporting Wizards
 
 ## Credits
 - Uses [WireGuard for Ubiquiti](https://github.com/WireGuard/wireguard-vyatta-ubnt) package
+- Uses [wireguard.js](https://git.zx2c4.com/wireguard-tools/tree/contrib/keygen-html/wireguard.js) javascript library to generate wireguard keys
 - Uses [QRCode.js](https://github.com/davidshimjs/qrcodejs/) javascript library to generate QRcode
 
 ## Features
