@@ -487,7 +487,6 @@ apply () {
         ret=$?
 
         output=$(cat $temp)
-        echo $output > /config/wizard/feature/WireGuard/apply.out
         rm -f $temp
     fi
 
