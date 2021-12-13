@@ -17,6 +17,7 @@ WireGuard Wizard for Ubiquiti EdgeMAX Devices supporting Wizards
 - Displays public key in wizard with option to show it as QRcode
 - Easy configuration of wg0 interface (does not touch/modify/save any existing wg1-wg999 interfaces)
 - Display latest handshake for each configured peer
+- Generate configuration for peers and display it as QRcode (config also shown in browser console for copy&paste)
 
 ## Installation
 To install the wizard in EdgeOS:
