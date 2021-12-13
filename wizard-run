@@ -2,7 +2,7 @@
 
 #
 # EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
-# Version 1.3-20211209
+# Version 1.4-20211213
 # ^-- previous line is used for version identification, dont remove this line!
 #
 # Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
@@ -309,7 +309,7 @@ load () {
         done
         latesthandshake="$(wg show wg0 latest-handshakes | grep "$peer" | awk '{print $2}')"
         latesthandshakeago="$(expr $(date +%s) - $latesthandshake)"
-        latesthandshaketext="$(date -ud @$latesthandshakeago +'%H hours %M minutes %S seconds ago')"
+        latesthandshaketext="$(date -ud @$latesthandshakeago +'%M minutes %S seconds ago')"
         [ -n "$latesthandshake" ] && [ "$latesthandshake" -gt 0 ] && latesthandshake="\"latesthandshake\":\"$latesthandshaketext\"" && peerlist+=",$latesthandshake"
         peerlist+='}'
     done
@@ -468,7 +468,7 @@ apply () {
                         done
                     fi
                     if [ $ret == 1 ]; then
-                        echo "something failed, check log!." >> $log
+                        echo "something failed, check log!" >> $log
                         break
                     fi
                     j=$(expr $j + 1)
@@ -487,6 +487,7 @@ apply () {
         ret=$?
 
         output=$(cat $temp)
+        echo $output > /config/wizard/feature/WireGuard/apply.out
         rm -f $temp
     fi
 
