@@ -2,7 +2,7 @@
 
 #
 # EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
-# Version 1.4-20211213
+# Version 1.5-20211217
 # ^-- previous line is used for version identification, dont remove this line!
 #
 # Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
@@ -10,10 +10,9 @@
 # Works on all EdgeRouter and EdgePoint devices (EdgeOS versions 1.9.0+ and 2.0+)
 #
 
-cfgusrdir="/config/user-data/"
-wgdir="${cfgusrdir}wireguard/"
+wgdir="/config/user-data/wireguard/"
 wgsettings="${wgdir}wgsettings.json"
-wgsetupscriptfile="/config/scripts/post-config.d/wireguard_setup.sh"
+wgsetupscriptfile="/config/scripts/pre-config.d/wireguard_setup.sh"
 wgautoupdatecronjob="/etc/cron.daily/wireguard_autoupdate"
 log="${wgdir}wireguard-wizard.log"
 wgpkgapi="https://api.github.com/repos/WireGuard/wireguard-vyatta-ubnt/releases/latest"
@@ -33,14 +32,17 @@ cmd=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
 run=/opt/vyatta/bin/vyatta-op-cmd-wrapper
 cli=cli-shell-api
 
-echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >>$log
+# if wizard log is greater than 1M then overwrite with new content
+if [ $(wc -c <$log) -ge 1048576 ]; then
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >$log
+else
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >>$log
+fi
 
-#function to write setup-script
 writesetupscript () {
     cat >$wgsetupscriptfile <<'ENDSCRIPTCONTENT'
 #!/bin/bash
-cfgusrdir="/config/user-data/"
-wgdir="${cfgusrdir}wireguard/"
+wgdir="/config/user-data/wireguard/"
 log="${wgdir}/wireguard-wizard-setup.log"
 echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running WireGuard setup script ..." >$log
 wireguardwizard=""
@@ -52,21 +54,11 @@ for i in $(find /config/wizard/feature/ -name wizard-run); do
     fi
 done
 if [ ! -f $wireguardwizard ]; then
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: WireGuard wizard not found!" >>$log
-    exit
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: WireGuard wizard not found! Exit." >>$log
+    exit 1
 fi
 echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running install function from wizard ... " >>$log
 $wireguardwizard install >>$log
-echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] install function done." >>$log
-echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running apply function from wizard ... " >>$log
-if [ -s "$wgdir/wgsettings.json" ]; then
-    chown -R root:vyattacfg /opt/vyatta/config/active/*
-    sg vyattacfg -c "$wireguardwizard apply ${wgdir}wgsettings.json" >>$log
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Settings from ${wgdir}wgsettings.json applied." >>$log
-else
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: ${wgdir}wgsettings.json does not exist or has zero size!" >>$log
-fi
-echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] apply function done." >>$log
 echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Finished WireGuard setup script..." >>$log
 exit 0
 ENDSCRIPTCONTENT
@@ -76,11 +68,52 @@ ENDSCRIPTCONTENT
 writecronjob () {
     cat >$wgautoupdatecronjob <<'ENDSCRIPTCONTENT'
 #!/bin/bash
-cfgusrdir="/config/user-data/"
-wgdir="${cfgusrdir}wireguard/"
-log="${wgdir}/wireguard-wizard-autoupdate.log"
-rm -f $wgdir/*.deb
-source /config/scripts/post-config.d/wireguard_setup.sh
+wgdir="/config/user-data/wireguard/"
+log="${wgdir}/wireguard-wizard.log"
+wireguardwizard=""
+for i in $(find /config/wizard/feature/ -name wizard-run); do
+    if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] WireGuard wizard found at $(dirname $i)" >>$log
+        wireguardwizard=$i
+        break
+    fi
+done
+if [ ! -f $wireguardwizard ]; then
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] Error: WireGuard wizard not found!" >>$log
+    exit 1
+else
+    onlinecheck="false"
+    curl -s --connect-timeout 3 https://api.github.com >/dev/null
+    if [ $? == 0 ]; then
+        onlinecheck="true"
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] online-check succeeded ..."
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] online-check failed. Exit."
+        exit 1
+    fi
+    if [[ "$($wireguardwizard load | jq -r .data.pkgstatus)" =~ .*new version found.* ]]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] New WireGuard package version found, upgrading ..." >>$log
+        if [ "$onlinecheck" == "true" ]; then
+            rm -f ${wgdir}/*.deb
+            $wireguardwizard install >>$log
+        fi
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] Current WireGuard package version is up-to-date." >>$log
+    fi
+    if [[ "$($wireguardwizard load | jq -r .data.wizstatus)" =~ .*new version found.* ]]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] New WireGuard wizard version found, upgrading ..." >>$log
+        if [ "$onlinecheck" == "true" ]; then
+            rm -f ${wgdir}/ER-wizard-WireGuard.tar
+            # remove stale setupscript
+            rm -f /config/scripts/post-config.d/wireguard_setup.sh
+            # remove stale wgsettings files
+            rm -f ${wgdir}wgsettings.*
+            $wireguardwizard install >>$log
+        fi
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] Current WireGuard wizard version is up-to-date." >>$log
+    fi
+fi
 exit 0
 ENDSCRIPTCONTENT
     chmod +x $wgautoupdatecronjob
@@ -92,7 +125,7 @@ installwireguard () {
     cd $wgdir
     echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] check if we are online (if we can reach github.com) ..."
     onlinecheck="false"
-    ping -w1 -c1 github.com >/dev/null
+    curl -s --connect-timeout 3 https://api.github.com >/dev/null
     if [ $? == 0 ]; then
         onlinecheck="true"
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] online-check succeeded ..."
@@ -118,17 +151,14 @@ installwireguard () {
         if [ "$onlinecheck" == "true" ]; then
             echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] We are online, remove ${pkgvariant} deb-file and download new one ..."
             rm -f ${wgdir}/${pkgvariant}*.deb
+            rm -f ${wgdir}/ER-wizard-WireGuard.tar
         fi
     fi
     if [ ! -f ${pkgvariant}*.deb ]; then
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file not found, need to download from latest release ..."
         if [ "$onlinecheck" == "true" ]; then
-            curl -sLo /tmp/wgwizlatest ${wgwizapi}
-            wizurl=$(jq -r '.assets[].browser_download_url' /tmp/wgwizlatest)
             curl -sLo /tmp/wgpkglatest ${wgpkgapi}
             pkgurl=$(jq -r '.assets[].browser_download_url | select(test("'$pkgvariant'"))' /tmp/wgpkglatest)
-            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of Wizard starting from $wizurl ..."
-            curl -sLO $wizurl
             echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of WireGuard starting from $pkgurl ..."
             curl -sLO $pkgurl
             echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
@@ -139,22 +169,34 @@ installwireguard () {
     else
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file $pkgvariant found in $(pwd) ..."
     fi
-    if [ -f ER-wizard-WireGuard.tar ]; then
-        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] -> Upgrading Wizard ..."
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..."
+    dpkg -i ${pkgvariant}*.deb
+    if [ ! -f ER-wizard-WireGuard.tar ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file not found, need to download from latest release ..."
+        if [ "$onlinecheck" == "true" ]; then
+            curl -sLo /tmp/wgwizlatest ${wgwizapi}
+            wizurl=$(jq -r '.assets[].browser_download_url' /tmp/wgwizlatest)
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of Wizard starting from $wizurl ..."
+            curl -sLO $wizurl
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
+        else
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Error: we are not online, can not download. Missing tar-file. Exit."
+            exit 1
+        fi
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file found in $(pwd) - installing WireGuard Wizard..."
         wireguardwizard=""
         for i in $(find /config/wizard/feature/ -name wizard-run); do
             if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
-                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] WireGuard wizard found at $i" >>$log
+                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard wizard found in $i" >>$log
                 wireguardwizard=$i
                 break
             fi
         done
-        tar -C $(dirname $wireguardwizard) -xf ER-wizard-WireGuard.tar
-        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Wizard upgrade done..."
     fi
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..."
-    dpkg -i ${pkgvariant}*.deb
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installation done."
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard wizard ..."
+    tar -C $(dirname $wireguardwizard) -xf ER-wizard-WireGuard.tar
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard and Wizard installation done."
 }
 
 # function called when you click the wizard
@@ -189,7 +231,7 @@ load () {
         fi
     else
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] wireguard package already installed! checking for new version on disk ..." >>$log
-        # check if latest version is installed from packages available in $cfgusrdir
+        # check if latest version is installed from packages available in $wgdir
         version_installed=$(dpkg -l wireguard | awk '/ii/ { print $3 }')
         version_latest=$(curl -s ${wgpkgapi} | jq -r .tag_name)
         dpkg --compare-versions $version_latest gt $version_installed
@@ -334,19 +376,11 @@ apply () {
         fi
     }
 
-    # save applied settings
-    if [ ! "$INPUT" == "$wgsettings" ]; then
-        # if not saved within last 20 seconds
-        #if [ $(( $(date +%s) - $(stat $wgsettings -c %Y) )) -gt 20 ]; then
-            cp -f $INPUT $wgsettings
-        #fi
-    fi
-
     # setup script
     if [ "$(jq -M -r '.wgsetupscript' $INPUT 2>/dev/null)" == "on" ]; then
-        if [ ! -f $wgsetupscriptfile ]; then
+        #if [ ! -f $wgsetupscriptfile ]; then
             writesetupscript
-        fi
+        #fi
     else
         rm -f $wgsetupscriptfile >/dev/null 2>/dev/null
     fi
