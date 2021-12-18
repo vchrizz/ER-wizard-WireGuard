@@ -294,9 +294,8 @@ document.onsubmit=function() {
     for(var i=0; i<latesthandshakefields.length; i++) {
         document.getElementsByName("latesthandshake")[i].disabled = true
     }
-}
     if (!(pkgstatus.value.match(/new version found/) || wizstatus.value.match(/new version found/))) {
         document.getElementById('updatefromgithub').disabled = true
     }
-
+}
 </script>
