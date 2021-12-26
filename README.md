@@ -15,7 +15,7 @@ WireGuard Wizard for Ubiquiti EdgeMAX Devices supporting Wizards
 - Automatic upgrade with daily check for latest release of "ER-wizard-WireGuard" and "WireGuard for Ubiquiti"
 - Generates private key automatically
 - Displays public key in wizard with option to show it as QRcode
-- Easy configuration of wg0 interface (does not touch/modify/save any existing wg1-wg999 interfaces)
+- Easy configuration of wg0 interface (does not modify but *save on upgrade* any existing wg1-wg999 interfaces)
 - Display latest handshake for each configured peer
 - Generate configuration for peers and display it as QRcode (config also shown in browser console for copy&paste)
 
