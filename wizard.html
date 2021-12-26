@@ -42,9 +42,9 @@ div#status {
     float:none;
     clear:both;
 }
-/* align public key input field 150px from left */
+/* align public key input field */
 div#publickey {
-    left:150px;
+    left:40px;
 }
 /* hide QR elements and align qrcode for pubkey */
 #qrcodepubkey {
@@ -85,17 +85,18 @@ td#allowedips {
     </table>
 </div>
 
-<fieldset id="wireguardconf" name="wireguardconf" class="primary expanded">
+<fieldset id="wireguardconf" name="wireguardconf" class="primary expanded" style="width:700px;">
     <div title="WireGuard - FAST, MODERN, SECURE, VPN TUNNEL" id="wireguardlogo"></div>
     <legend>Configuration</legend>
     <div><span><input name="wgenable" type="checkbox" /></span></div><div><span class="text" data-infotip="Configure interface wg0 and generate private key.">Enable</span></div><br><br>
     <div><span class="text" data-infotip="WireGuard Server Port - enables listen-port if set. Only required if you want to connect clients to this device.">Server Port</span></div><br>
     <span><input name="listen-port" size="5" placeholder="N/A" title="for example: 51820" /></span><br>
-    <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled, must be set manually to 'false' in Config Tree if you really want to disable this option.">Route allowed IPs</span></div><br>
+    <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled, must be set manually to 'false' in Config Tree if you really want to disable this option.">Route allowed IPs</span></div><br><br>
+    <div><span class="text" data-infotip="Sets IP address on interface wg0 (optional).">IP: <input name="ipaddress" size="13" placeholder="192.168.1.1/24"></span></div>
     <div id="publickey">
         <input type="hidden" id="privatekey" name="privatekey" />
         <div>
-            <span>My public key: </span>
+            <span>Public key: </span>
             <span><input disabled id="localpubkey" name="localpubkey" placeholder="N/A" size="45" title="public wireguard key calculated from private key" /></span>
         </div>
         <div class="addable" data-min="0" data-max="1" data-object="qrcodepubkey" data-objectify="0">
@@ -103,7 +104,7 @@ td#allowedips {
         </div>
     </div>
     <div id="qrcodepubkey" style="display:none;"></div>
-    <div class="clear"></div>
+    <div class="clear"><br></div>
     <span><b><u>Peers:</u></b></span><br>
     <div class="addable" data-min="0" data-max="20" data-object="peerlist" data-objectify="1">
         <div class="addable-container"></div>
@@ -293,9 +294,6 @@ document.onsubmit=function() {
     latesthandshakefields = document.getElementsByName("latesthandshake")
     for(var i=0; i<latesthandshakefields.length; i++) {
         document.getElementsByName("latesthandshake")[i].disabled = true
-    }
-    if (!(pkgstatus.value.match(/new version found/) || wizstatus.value.match(/new version found/))) {
-        document.getElementById('updatefromgithub').disabled = true
     }
 }
 </script>
