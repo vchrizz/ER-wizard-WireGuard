@@ -2,7 +2,7 @@
 
 #
 # EdgeMAX Wizard "WireGuard" created 11/2021 by FreiesNetz.at
-# Version 1.5-20211217
+# Version 1.6-20211226
 # ^-- previous line is used for version identification, dont remove this line!
 #
 # Github repository: https://github.com/vchrizz/ER-wizard-WireGuard/
@@ -301,6 +301,13 @@ load () {
         routeallowedips="on"
     fi
 
+    # Inputfield ip address
+    ipaddress=""
+    eval "ipaddr=($($run show interfaces wireguard wg0 brief | awk '/wg0/ {print $2}'))"
+    if [ ! "$ipaddr" == "-" ]; then
+        ipaddress="\"ipaddress\":\"$ipaddr\""
+    fi
+
     # (disabled) Inputfield "My public key"
     eval "privatekey=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} private-key))"
     if [ -n "$privatekey" ]; then
@@ -359,7 +366,7 @@ load () {
     #
     # get all variables together for output
     #
-    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
+    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$ipaddress,$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
 }
 
 # function called when you click apply
@@ -417,6 +424,7 @@ apply () {
     fi
     parse listenport '."listen-port"'
     parse routeallowedips '."route-allowed-ips"'
+    parse ipaddress '."ipaddress"'
     parse pubkeys '."peerlist"[]."public-key"'
     parse endpoints '."peerlist"[]."endpoint"'
     parse presharedkeys '."peerlist"[]."preshared-key"'
@@ -469,6 +477,11 @@ apply () {
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips false; then
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips false failed." >> $log
                         ret=1
+                    fi
+                fi
+                if [ -n "$ipaddress" ]; then
+                    if ! $cmd set $wgcfg ${interfaces[0]} address $ipaddress; then
+                        echo "set $wgcfg ${interfaces[0]} address $ipaddress failed." >> $log
                     fi
                 fi
                 j=0
