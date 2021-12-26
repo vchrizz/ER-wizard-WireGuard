@@ -465,6 +465,11 @@ apply () {
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips true failed." >> $log
                         ret=1
                     fi
+                else
+                    if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips false; then
+                        echo "set $wgcfg ${interfaces[0]} route-allowed-ips false failed." >> $log
+                        ret=1
+                    fi
                 fi
                 j=0
                 for ((i = 0; i < ${#pubkeys[@]}; i++)); do
