@@ -302,7 +302,7 @@ load () {
     fi
 
     # Inputfield ip address
-    ipaddress=""
+    ipaddress="\"ipaddress\":\"\""
     eval "ipaddr=($($run show configuration commands | awk '/wg0 address/ {print $6}'))"
     if [ -n "$ipaddr" ]; then
         ipaddress="\"ipaddress\":\"$ipaddr\""
