@@ -303,8 +303,8 @@ load () {
 
     # Inputfield ip address
     ipaddress=""
-    eval "ipaddr=($($run show interfaces wireguard wg0 brief | awk '/wg0/ {print $2}'))"
-    if [ ! "$ipaddr" == "-" ]; then
+    eval "ipaddr=($($run show configuration commands | awk '/wg0 address/ {print $6}'))"
+    if [ -n "$ipaddr" ]; then
         ipaddress="\"ipaddress\":\"$ipaddr\""
     fi
 
@@ -340,7 +340,7 @@ load () {
                 [ -n "$allowedips" ] && allowedips="\"allowed-ips\":[$allowedips]" && peerlist+=",$allowedips"
             fi
             if [ "$setting" == "description" ]; then
-                eval "description=($($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer description))"
+                description="$($cli returnActiveValue $wgcfg ${interfaces[0]} peer $peer description)"
                 [ -n "$description" ] && description="\"description\":\"$description\"" && peerlist+=",$description"
             fi
             if [ "$setting" == "endpoint" ]; then
@@ -426,6 +426,7 @@ apply () {
     parse routeallowedips '."route-allowed-ips"'
     parse ipaddress '."ipaddress"'
     parse pubkeys '."peerlist"[]."public-key"'
+    parse descriptions '."peerlist"[]."description"'
     parse endpoints '."peerlist"[]."endpoint"'
     parse presharedkeys '."peerlist"[]."preshared-key"'
     parse persistentkeepalives '."peerlist"[]."persistent-keepalive"'
@@ -488,6 +489,13 @@ apply () {
                 for ((i = 0; i < ${#pubkeys[@]}; i++)); do
                     if [ -z "${pubkeys[i]}" ] || [ "${pubkeys[i]}" == null ]; then
                         continue
+                    fi
+                    if [ -n "${descriptions[i]}" ]; then
+                        if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description "${descriptions[i]}"; then
+                            echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" description \"${descriptions[i]}\" failed." >> $log
+                            ret=1
+                            break
+                        fi
                     fi
                     if [ -n "${endpoints[i]}" ]; then
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint "${endpoints[i]}"; then
