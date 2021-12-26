@@ -91,7 +91,7 @@ td#allowedips {
     <div><span><input name="wgenable" type="checkbox" /></span></div><div><span class="text" data-infotip="Configure interface wg0 and generate private key.">Enable</span></div><br><br>
     <div><span class="text" data-infotip="WireGuard Server Port - enables listen-port if set. Only required if you want to connect clients to this device.">Server Port</span></div><br>
     <span><input name="listen-port" size="5" placeholder="N/A" title="for example: 51820" /></span><br>
-    <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled, must be set manually to 'false' in Config Tree if you really want to disable this option.">Route allowed IPs</span></div><br><br>
+    <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled.">Route allowed IPs</span></div><br><br>
     <div><span class="text" data-infotip="Sets IP address on interface wg0 (optional).">IP: <input name="ipaddress" size="13" placeholder="192.168.1.1/24"></span></div>
     <div id="publickey">
         <input type="hidden" id="privatekey" name="privatekey" />
@@ -112,6 +112,8 @@ td#allowedips {
             <div class="multi">
                 <table border=0 width="650px" cellspacing=0 cellpadding=0><tr><td>
                     <table border=0 width="450px"><tr>
+                        <td>Description: </td><td><input name="description" size="30" placeholder="N/A" title="Description of the remote peer" /></td>
+                    </tr><tr>
                         <td>Remote endpoint: </td><td><input name="endpoint" size="30" placeholder="server.example.org:51820" title="Remote server address with port" /></td>
                     </tr><tr>
                         <td>Public key: </td><td><input name="public-key" size="45" placeholder="N/A" title="Remote public key (required)" /></td>
