@@ -40,6 +40,7 @@ else
 fi
 
 writesetupscript () {
+    mkdir -p $(dirname $wgsetupscriptfile)
     cat >$wgsetupscriptfile <<'ENDSCRIPTCONTENT'
 #!/bin/bash
 wgdir="/config/user-data/wireguard/"
@@ -309,7 +310,7 @@ load () {
     fi
 
     # (disabled) Inputfield "My public key"
-    eval "privatekey=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} private-key))"
+    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"    
     if [ -n "$privatekey" ]; then
         localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
     fi
@@ -572,7 +573,7 @@ apply () {
                     j=$(expr $j + 1)
                 done
             fi
-        
+
             if [ $ret == 0 ]; then
                 $cmd commit || ret=1
             fi

@@ -118,7 +118,7 @@ td#allowedips {
         <div class="addable-container"></div>
         <div class="addable-template">
             <div class="multi">
-                <table name="peertable" border=0 width="650px" cellspacing=0 cellpadding=0><tr><td>
+                <table border=0 width="650px" cellspacing=0 cellpadding=0><tr><td>
                     <table border=0 width="450px"><tr>
                         <td>Description: </td><td><input name="description" size="30" placeholder="N/A" title="Description of the remote peer" /></td>
                     </tr><tr>
@@ -367,4 +367,13 @@ document.onsubmit=function() {
         document.getElementsByName("latesthandshake")[i].disabled = true
     }
 }
+$(function () {
+  EDGE.Views.Global.WizardBase.prototype.addLabel = function() {
+    switch (arguments.callee.caller.caller.caller.caller.caller.caller.caller.caller.caller.arguments[1].parentElement.dataset.object) {
+      case 'qrcodeclientconf': return 'Generate config';
+      case 'allowed-ips': return 'Add IP';
+      default: return null;
+    }
+  };
+})
 </script>
