@@ -40,7 +40,6 @@ else
 fi
 
 writesetupscript () {
-    mkdir -p $(dirname $wgsetupscriptfile)
     cat >$wgsetupscriptfile <<'ENDSCRIPTCONTENT'
 #!/bin/bash
 wgdir="/config/user-data/wireguard/"
@@ -310,7 +309,7 @@ load () {
     fi
 
     # (disabled) Inputfield "My public key"
-    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"
+    eval "privatekey=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} private-key))"
     if [ -n "$privatekey" ]; then
         localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
     fi
@@ -318,6 +317,14 @@ load () {
 
     # (hidden) Inputfield "private key"
     privatekey="\"privatekey\":\"$privatekey\""
+
+    # Inputfield allowed ips for peers QR code
+    eval "peersallowedips=($($run show configuration commands | awk '/wireguard-wizard-peers-allowed-ips/ {print $5}'))"
+    peersallowedips="\"peers-allowed-ips\":\"$peersallowedips\""
+
+    # Inputfield DNS for peers QR code
+    eval "peersdns=($($run show configuration commands | awk '/wireguard-wizard-peers-dns/ {print $5}'))"
+    peersdns="\"peers-dns\":\"$peersdns\""
 
     # Peers:
     # get current wireguard configuration and return configured values to wizard.html
@@ -367,7 +374,7 @@ load () {
     #
     # get all variables together for output
     #
-    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$ipaddress,$localpubkey,$privatekey,\"peerlist\":[$peerlist] }}"
+    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$ipaddress,$localpubkey,$privatekey,$peersallowedips,$peersdns,\"peerlist\":[$peerlist] }}"
 }
 
 # function called when you click apply
@@ -426,6 +433,8 @@ apply () {
     parse listenport '."listen-port"'
     parse routeallowedips '."route-allowed-ips"'
     parse ipaddress '."ipaddress"'
+    parse peersallowedips '."peers-allowed-ips"'
+    parse peersdns '."peers-dns"'
     parse pubkeys '."peerlist"[]."public-key"'
     parse descriptions '."peerlist"[]."description"'
     parse endpoints '."peerlist"[]."endpoint"'
@@ -450,6 +459,18 @@ apply () {
         (
             $cmd begin
             ret=0
+            if $cmd show | grep -q "wireguard-wizard-peers-allowed-ips"; then
+                if ! $cmd delete custom-attribute wireguard-wizard-peers-allowed-ips; then
+                    echo "$cmd delete custom-attribute wireguard-wizard-peers-allowed-ips failed." >> $log
+                    ret=1
+                fi
+            fi            
+            if $cmd show | grep -q "wireguard-wizard-peers-dns"; then
+                if ! $cmd delete custom-attribute wireguard-wizard-peers-dns; then
+                    echo "$cmd delete custom-attribute wireguard-wizard-peers-dns failed." >> $log
+                    ret=1
+                fi
+            fi            
             eval "interfaces=($($cli listActiveNodes $wgcfg))"
             if [ -n "$interfaces" ]; then
                 #$cmd delete $wgcfg ${interfaces[0]} || ret=1
@@ -484,6 +505,22 @@ apply () {
                 if [ -n "$ipaddress" ]; then
                     if ! $cmd set $wgcfg ${interfaces[0]} address $ipaddress; then
                         echo "set $wgcfg ${interfaces[0]} address $ipaddress failed." >> $log
+                    fi
+                fi
+                if [ -n "$peersallowedips" ]; then
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-allowed-ips; then
+                        echo "set custom-attribute wireguard-wizard-peers-allowed-ips failed." >> $log
+                    fi
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-allowed-ips value $peersallowedips; then
+                        echo "set custom-attribute wireguard-wizard-peers-allowed-ips value $peersallowedips failed." >> $log
+                    fi
+                fi
+                if [ -n "$peersdns" ]; then
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-dns; then
+                        echo "set custom-attribute wireguard-wizard-peers-dns failed." >> $log
+                    fi
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-dns value $peersdns; then
+                        echo "set custom-attribute wireguard-wizard-peers-dns value $peersdns failed." >> $log
                     fi
                 fi
                 j=0
@@ -535,7 +572,7 @@ apply () {
                     j=$(expr $j + 1)
                 done
             fi
-
+        
             if [ $ret == 0 ]; then
                 $cmd commit || ret=1
             fi
