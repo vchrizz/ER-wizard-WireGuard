@@ -310,7 +310,7 @@ load () {
     fi
 
     # (disabled) Inputfield "My public key"
-    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"    
+    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"
     if [ -n "$privatekey" ]; then
         localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
     fi
