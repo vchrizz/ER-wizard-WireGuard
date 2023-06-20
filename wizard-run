@@ -155,7 +155,7 @@ installwireguard () {
             rm -f ${wgdir}/ER-wizard-WireGuard.tar
         fi
     fi
-    if [ ! -f ${pkgvariant}*.deb ]; then
+    if [ ! -f "$wgpackage" ]; then
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file not found, need to download from latest release ..."
         if [ "$onlinecheck" == "true" ]; then
             curl -sLo /tmp/wgpkglatest ${wgpkgapi}
@@ -288,16 +288,16 @@ load () {
 
     # Checkbox "Enable"
     wgenable="\"wgenable\":false"
-    eval "interfaces=($($cli listActiveNodes interfaces wireguard))"
+    eval "interfaces=($($cli listActiveNodes $wgcfg))"
     if [ "${interfaces[0]}" == "wg0" ]; then wgenable="\"wgenable\":\"on\""; fi
 
     # Inputfield "Server Port"
-    eval "listenport=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} listen-port))"
+    eval "listenport=($($cli returnActiveValue $wgcfg ${interfaces[0]} listen-port))"
     listenport="\"listen-port\":\"$listenport\""
 
     # Checkbox "Route allowed IPs" (default value: true)
     routeallowedips=""
-    routeallowedips_vyatta=$($cli returnActiveValue interfaces wireguard ${interfaces[0]} route-allowed-ips)
+    routeallowedips_vyatta=$($cli returnActiveValue $wgcfg ${interfaces[0]} route-allowed-ips)
     if [ -n "$routeallowedips_vyatta" ] && [ $routeallowedips_vyatta == "true" ]; then
         routeallowedips="on"
     fi
@@ -310,14 +310,20 @@ load () {
     fi
 
     # (disabled) Inputfield "My public key"
-    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"
+    eval "privatekey=($($run show $wgcfg ${interfaces[0]} private-key))"
     if [ -n "$privatekey" ]; then
         localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
     fi
     localpubkey="\"localpubkey\":\"$localpubkey\""
 
+    # privatekeycfg can be a file path or key / privatekey always has a key
+    eval "privatekeycfg=($($cli returnActiveValue $wgcfg ${interfaces[0]} private-key))"
+    if [ -z "$privatekeycfg" ]; then
+        echo "[INFO] privatekeycfg=($($cli returnActiveValue $wgcfg ${interfaces[0]} private-key)) is empty!." >> $log
+    fi
+
     # (hidden) Inputfield "private key"
-    privatekey="\"privatekey\":\"$privatekey\""
+    privatekey="\"privatekey\":\"$privatekeycfg\""
 
     # Peers:
     # get current wireguard configuration and return configured values to wizard.html
@@ -451,37 +457,44 @@ apply () {
             $cmd begin
             ret=0
             eval "interfaces=($($cli listActiveNodes $wgcfg))"
-            if [ -n "$interfaces" ]; then
-                #$cmd delete $wgcfg ${interfaces[0]} || ret=1
-                if ! $cmd delete $wgcfg ${interfaces[0]}; then
-                    echo "$cmd delete $wgcfg ${interfaces[0]} failed." >> $log
-                    ret=1
+            if [ ! "$wgenable" == "on" ]; then
+                if [ -n "$interfaces" ]; then
+                    #$cmd delete $wgcfg ${interfaces[0]} || ret=1
+                    if ! $cmd delete $wgcfg ${interfaces[0]}; then
+                        echo "$cmd delete $wgcfg ${interfaces[0]} failed." >> $log
+                        ret=1
+                    fi
                 fi
             fi
             if [ "$wgenable" == "on" ]; then
                 interfaces="wg0"
+                $cmd delete $wgcfg ${interfaces[0]} private-key
                 if ! $cmd set $wgcfg ${interfaces[0]} private-key "${privatekey}"; then
                     echo "set $wgcfg ${interfaces[0]} private-key \"${privatekey}\" failed." >> $log
                     ret=1
                 fi
                 if [ -n "$listenport" ]; then
+                    $cmd delete $wgcfg ${interfaces[0]} listen-port
                     if ! $cmd set $wgcfg ${interfaces[0]} listen-port "${listenport}"; then
                         echo "set $wgcfg ${interfaces[0]} listen-port \"${listenport}\" failed." >> $log
                         ret=1
                     fi
                 fi
                 if [ "$routeallowedips" == "on" ]; then
+                    $cmd delete $wgcfg ${interfaces[0]} route-allowed-ips
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips true; then
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips true failed." >> $log
                         ret=1
                     fi
                 else
+                    $cmd delete $wgcfg ${interfaces[0]} route-allowed-ips
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips false; then
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips false failed." >> $log
                         ret=1
                     fi
                 fi
                 if [ -n "$ipaddress" ]; then
+                    $cmd delete $wgcfg ${interfaces[0]} address
                     if ! $cmd set $wgcfg ${interfaces[0]} address $ipaddress; then
                         echo "set $wgcfg ${interfaces[0]} address $ipaddress failed." >> $log
                     fi
@@ -492,6 +505,7 @@ apply () {
                         continue
                     fi
                     if [ -n "${descriptions[i]}" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description "${descriptions[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" description \"${descriptions[i]}\" failed." >> $log
                             ret=1
@@ -499,6 +513,7 @@ apply () {
                         fi
                     fi
                     if [ -n "${endpoints[i]}" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint "${endpoints[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" endpoint \"${endpoints[i]}\" failed." >> $log
                             ret=1
@@ -506,6 +521,7 @@ apply () {
                         fi
                     fi
                     if [ -n "${persistentkeepalives[i]}" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive "${persistentkeepalives[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" persistent-keepalive \"${persistentkeepalives[i]}\" failed." >> $log
                             ret=1
@@ -513,6 +529,7 @@ apply () {
                         fi
                     fi
                     if [ -n "${presharedkeys[i]}" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key "${presharedkeys[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" preshared-key \"${presharedkeys[i]}\" failed." >> $log
                             ret=1
@@ -520,6 +537,7 @@ apply () {
                         fi
                     fi
                     if [ -n "${allowedips[j]}" ] && [ "${allowedips[j]}" != "null" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips
                         for allowedip in ${allowedips[j]}; do
                             if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips "$allowedip"; then
                                 echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" allowed-ips \"$allowedip\" failed." >> $log
