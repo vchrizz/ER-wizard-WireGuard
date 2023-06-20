@@ -459,15 +459,17 @@ apply () {
             eval "interfaces=($($cli listActiveNodes $wgcfg))"
             if [ ! "$wgenable" == "on" ]; then
                 if [ -n "$interfaces" ]; then
-                    #$cmd delete $wgcfg ${interfaces[0]} || ret=1
-                    if ! $cmd delete $wgcfg ${interfaces[0]}; then
-                        echo "$cmd delete $wgcfg ${interfaces[0]} failed." >> $log
+                    $cmd delete $wgcfg ${interfaces[0]} disable
+                    if ! $cmd set $wgcfg ${interfaces[0]} disable; then
+                        echo "set $wgcfg ${interfaces[0]} disable failed." >> $log
                         ret=1
                     fi
                 fi
             fi
             if [ "$wgenable" == "on" ]; then
                 interfaces="wg0"
+                $cmd delete $wgcfg ${interfaces[0]} disable
+                
                 $cmd delete $wgcfg ${interfaces[0]} private-key
                 if ! $cmd set $wgcfg ${interfaces[0]} private-key "${privatekey}"; then
                     echo "set $wgcfg ${interfaces[0]} private-key \"${privatekey}\" failed." >> $log
