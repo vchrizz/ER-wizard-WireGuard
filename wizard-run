@@ -288,29 +288,31 @@ load () {
 
     # Checkbox "Enable"
     wgenable="\"wgenable\":false"
-    eval "interfaces=($($cli listActiveNodes interfaces wireguard))"
+    eval "interfaces=($($cli listActiveNodes $wgcfg))"
     if [ "${interfaces[0]}" == "wg0" ]; then wgenable="\"wgenable\":\"on\""; fi
 
     # Inputfield "Server Port"
-    eval "listenport=($($cli returnActiveValue interfaces wireguard ${interfaces[0]} listen-port))"
+    eval "listenport=($($cli returnActiveValue $wgcfg ${interfaces[0]} listen-port))"
     listenport="\"listen-port\":\"$listenport\""
 
     # Checkbox "Route allowed IPs" (default value: true)
     routeallowedips=""
-    routeallowedips_vyatta=$($cli returnActiveValue interfaces wireguard ${interfaces[0]} route-allowed-ips)
+    routeallowedips_vyatta=$($cli returnActiveValue $wgcfg ${interfaces[0]} route-allowed-ips)
     if [ -n "$routeallowedips_vyatta" ] && [ $routeallowedips_vyatta == "true" ]; then
         routeallowedips="on"
     fi
 
     # Inputfield ip address
-    ipaddress="\"ipaddress\":\"\""
-    eval "ipaddr=($($run show configuration commands | awk '/wg0 address/ {print $6}'))"
-    if [ -n "$ipaddr" ]; then
-        ipaddress="\"ipaddress\":\"$ipaddr\""
-    fi
+    ipaddress=''
+    eval "ipaddrvalues=($($cli returnActiveValues $wgcfg ${interfaces[0]} address))"
+    for ipaddrvalue in "${ipaddrvalues[@]}"; do
+        [ -n "$ipaddress" ] && ipaddress+=','
+        ipaddress+="\"$ipaddrvalue\""
+    done
+    ipaddress="\"ipaddress\":[$ipaddress]"
 
     # (disabled) Inputfield "My public key"
-    eval "privatekey=($($run show interfaces wireguard ${interfaces[0]} private-key))"
+    eval "privatekey=($($run show $wgcfg ${interfaces[0]} private-key))"
     if [ -n "$privatekey" ]; then
         localpubkey=$(echo "$privatekey" | /usr/bin/wg pubkey)
     fi
@@ -433,7 +435,7 @@ apply () {
     fi
     parse listenport '."listen-port"'
     parse routeallowedips '."route-allowed-ips"'
-    parse ipaddress '."ipaddress"'
+    mapfile -t ipaddress < <(cat $INPUT | jq -c '."ipaddress"' | sed 's/,/ /g;s/\[//;s/\]//;s/\"//g')
     parse peersallowedips '."peers-allowed-ips"'
     parse peersdns '."peers-dns"'
     parse pubkeys '."peerlist"[]."public-key"'
@@ -503,10 +505,14 @@ apply () {
                         ret=1
                     fi
                 fi
-                if [ -n "$ipaddress" ]; then
-                    if ! $cmd set $wgcfg ${interfaces[0]} address $ipaddress; then
-                        echo "set $wgcfg ${interfaces[0]} address $ipaddress failed." >> $log
-                    fi
+                if [ -n "${ipaddress}" ] && [ "${ipaddress}" != "null" ]; then
+                    for oneipaddress in ${ipaddress}; do
+                        if ! $cmd set $wgcfg ${interfaces[0]} address $oneipaddress; then
+                            echo "set $wgcfg ${interfaces[0]} address $oneipaddress failed." >> $log
+                            ret=1
+                            break 2
+                        fi
+                    done
                 fi
                 if [ -n "$peersallowedips" ]; then
                     if ! $cmd set custom-attribute wireguard-wizard-peers-allowed-ips; then
