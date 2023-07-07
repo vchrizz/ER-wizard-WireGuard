@@ -92,7 +92,7 @@ td#allowedips {
     <div><span class="text" data-infotip="WireGuard Server Port - enables listen-port if set. Only required if you want to connect clients to this device.">Server Port</span></div><br>
     <span><input name="listen-port" size="5" placeholder="N/A" title="for example: 51820" /></span><br>
     <div><span><input name="route-allowed-ips" type="checkbox" /></span></div><div><span class="text" data-infotip="Add the allowed IPs for all peers to the routing table. By default this is enabled.">Route allowed IPs</span></div><br><br>
-    <span class="text" data-infotip="Sets IP address on interface wg0 (optional).">IP: </span><br>
+    <div><span class="text" data-infotip="Sets IP address on interface wg0 (optional).">IP: </span><br>
     <div class="addable" data-min="0" data-max="20" data-object="ipaddress" data-objectify="0">
         <div class="addable-container"></div>
         <div class="addable-template" style="padding-top:0px">
@@ -102,6 +102,7 @@ td#allowedips {
             </div>
         </div>
         <button type="button" class="addable-add">Add IP</button>
+    </div>
     </div>
     <div id="publickey">
         <input type="hidden" id="privatekey" name="privatekey" />
@@ -117,9 +118,30 @@ td#allowedips {
     <div class="clear"><br></div>
     <span><b><u>Peers common options:</u></b></span><br>
     <table border=0 width="450px"><tr>
-    <td><div><span class="text" data-infotip="Allowed IP from peers point of view, for QR code (optional).">Peers allowed ips: </span></td><td><input id="peers-allowed-ips" name="peers-allowed-ips" size="13" placeholder="192.168.1.1/24"></div></td>
-    </tr><tr>
-    <td><div><span class="text" data-infotip="DNS from peers point of view, for QR code (optional).">Peers DNS: </span></td><td><input id="peers-dns" name="peers-dns" size="13" placeholder="1.1.1.1"></div></td>
+    <td><div><span class="text" data-infotip="Allowed IPs from peers point of view, for QR code (optional).">Peers allowed ips: </span></td><td>
+        <div class="addable" data-min="0" data-max="20" data-object="peers-allowed-ips" data-objectify="0">
+            <div class="addable-container"></div>
+            <div class="addable-template" style="padding-top:0px">
+                <div class="multi">
+                    <input name="peers-allowed-ips" size="13" placeholder="192.168.1.0/24" title="Peers allowed IPs" />
+                    <button type="button" class="addable-remove"></button>
+                </div>
+            </div>
+            <button type="button" class="addable-add">Add IP</button>
+        </div>
+    </tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr>
+    <td><div><span class="text" data-infotip="DNS or domain search list from peers point of view, for QR code (optional).">Peers DNS: </span></td><td>
+        <div class="addable" data-min="0" data-max="20" data-object="peers-dns" data-objectify="0">
+            <div class="addable-container"></div>
+            <div class="addable-template" style="padding-top:0px">
+                <div class="multi">
+                    <input name="peers-dns" size="13" placeholder="192.168.1.1" title="DNS or domain search list" />
+                    <button type="button" class="addable-remove"></button>
+                </div>
+            </div>
+            <button type="button" class="addable-add">Add IP or domain</button>
+        </div>
+    </div></td>
     </tr><tr>
     <td><div class="clear"><br></div></td><td><div class="clear"><br></div></td>
     </tr></table>
@@ -245,8 +267,24 @@ async function toggleQRclientconf() {
     var clientprivkey = keypair["privateKey"];
     var clientpubkey = keypair["publicKey"];
     var serverpubkey = document.getElementById('localpubkey').value;
-    var peersallowedips = document.getElementById('peers-allowed-ips').value;
-    var peersdns = document.getElementById('peers-dns').value;
+    //var peersallowedips = document.getElementById('peers-allowed-ips').value;
+    var peersallowedips = "";
+    const pamatches = document.querySelectorAll('[name^="peers-allowed-ips"]');
+    for (const node of pamatches.values()) {
+        if (peersallowedips) {
+            peersallowedips += ',';
+        }
+        peersallowedips += node.value;
+    }
+    //var peersdns = document.getElementById('peers-dns').value;
+    var peersdns = "";
+    const pdmatches = document.querySelectorAll('[name^="peers-dns"]');
+    for (const node of pdmatches.values()) {
+        if (peersdns) {
+            peersdns += ',';
+        }
+        peersdns += node.value;
+    }
     // A revoir par peernumber
     var persistentkeepalive = "";
     var endpoint = "";
