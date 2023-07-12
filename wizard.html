@@ -142,6 +142,10 @@ td#allowedips {
             <button type="button" class="addable-add">Add IP or domain</button>
         </div>
     </div></td>
+    </tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr>
+    <td><div><span class="text" data-infotip="Remote server address with port from peers point of view, for QR code (optional).">Peers remote endpoint: </span></td><td>
+        <input name="peers-endpoint" id="peers-endpoint" size="30" placeholder="server.example.org:51820" title="Remote server address with port" /></td>
+    </div></td>
     </tr><tr>
     <td><div class="clear"><br></div></td><td><div class="clear"><br></div></td>
     </tr></table>
@@ -285,9 +289,8 @@ async function toggleQRclientconf() {
         }
         peersdns += node.value;
     }
-    // A revoir par peernumber
     var persistentkeepalive = "";
-    var endpoint = "";
+    var endpoint = document.getElementById('peers-endpoint').value;
     var address = "";
     var config = "";
     var myfield1 = document.getElementsByName("public-key" + peernumber);
@@ -327,7 +330,6 @@ async function toggleQRclientconf() {
             }
         }
         persistentkeepalive = document.getElementsByName('persistent-keepalive' + peernumber)[0].value;
-        endpoint = document.getElementsByName('endpoint' + peernumber)[0].value;
         while (myfield2) {
             myfield2 = myfield2.parentNode;
             if (myfield2.tagName.toLowerCase() === 'div' && myfield2.className.toLowerCase() === 'multi') {

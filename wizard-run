@@ -331,6 +331,10 @@ load () {
     peersdns="\"peers-dns\":[\"$peersdns\"]"
     peersdns=${peersdns//,/\",\"}
 
+    # Inputfield endpoint for peers QR code
+    eval "peersendpoint=($($run show configuration commands | awk '/wireguard-wizard-peers-endpoint/ {print $5}'))"
+    peersendpoint="\"peers-endpoint\":\"$peersendpoint\""
+    
     # Peers:
     # get current wireguard configuration and return configured values to wizard.html
     peerlist=''
@@ -379,7 +383,7 @@ load () {
     #
     # get all variables together for output
     #
-    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$ipaddress,$localpubkey,$privatekey,$peersallowedips,$peersdns,\"peerlist\":[$peerlist] }}"
+    echo "{\"success\":\"1\",\"data\":{ $pkgstatus,$procstatus,$wizstatus,$wgsetupscript,$autoupdatefromgithub,$wgenable,$listenport,\"route-allowed-ips\":\"$routeallowedips\",$ipaddress,$localpubkey,$privatekey,$peersallowedips,$peersdns,$peersendpoint,\"peerlist\":[$peerlist] }}"
 }
 
 # function called when you click apply
@@ -442,6 +446,7 @@ apply () {
     peersallowedips=$(cat $INPUT | jq -c '."peers-allowed-ips"' | sed 's/\[//;s/\]//;s/\"//g')
     #parse peersdns '."peers-dns"'
     peersdns=$(cat $INPUT | jq -c '."peers-dns"' | sed 's/\[//;s/\]//;s/\"//g')
+    parse peersendpoint '."peers-endpoint"'
     parse pubkeys '."peerlist"[]."public-key"'
     parse descriptions '."peerlist"[]."description"'
     parse endpoints '."peerlist"[]."endpoint"'
@@ -532,6 +537,14 @@ apply () {
                     fi
                     if ! $cmd set custom-attribute wireguard-wizard-peers-dns value "$peersdns"; then
                         echo "set custom-attribute wireguard-wizard-peers-dns value \"$peersdns\" failed." >> $log
+                    fi
+                fi
+                if [ -n "$peersendpoint" ]; then
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-endpoint; then
+                        echo "set custom-attribute wireguard-wizard-peers-endpoint failed." >> $log
+                    fi
+                    if ! $cmd set custom-attribute wireguard-wizard-peers-endpoint value "$peersendpoint"; then
+                        echo "set custom-attribute wireguard-wizard-peers-endpoint value \"$peersendpoint\" failed." >> $log
                     fi
                 fi
                 j=0
