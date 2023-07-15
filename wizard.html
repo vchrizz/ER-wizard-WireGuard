@@ -176,8 +176,9 @@ td#allowedips {
                             <div class="addable" data-min="0" data-max="1" data-object="qrcodeclientconf" data-objectify="0">
                                 <div class="addable-template">
                                     <div class="multi">
-                                        <input disabled type="image" src="" id="qrcodeclientconf" width="0" height="0" name="qrcodeclientconf" title="Client configuration QR code" ></input><br>
+                                        <input disabled value="" type="image" src="" id="qrcodeclientconf" width="0" height="0" name="qrcodeclientconf" title="Client configuration QR code" ></input>
                                         <!-- <button type="button" class="addable-remove"></button> -->
+                                        <br><button class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" type="button" role="button" aria-disabled="false" onclick="downloadConf()"><span class="ui-button-text">Download client configuration</span></button>
                                     </div>
                                 </div>
                                 <div class="addable-container"></div>
@@ -265,11 +266,9 @@ function getNearestTableAncestor(htmlElementNode) {
     return undefined;
 }
 
-async function toggleQRclientconf() {
-    var presharedkey = window.wireguard.generateKeypair()["privateKey"];
-    var keypair = window.wireguard.generateKeypair();
-    var clientprivkey = keypair["privateKey"];
-    var clientpubkey = keypair["publicKey"];
+function setConfig() {
+    var clientprivkey = document.getElementsByName("private-key" + peernumber)[0].value;
+    var clientpubkey = document.getElementsByName("public-key" + peernumber)[0].value;
     var serverpubkey = document.getElementById('localpubkey').value;
     //var peersallowedips = document.getElementById('peers-allowed-ips').value;
     var peersallowedips = "";
@@ -289,47 +288,13 @@ async function toggleQRclientconf() {
         }
         peersdns += node.value;
     }
-    var persistentkeepalive = "";
     var endpoint = document.getElementById('peers-endpoint').value;
-    var address = "";
-    var config = "";
-    var myfield1 = document.getElementsByName("public-key" + peernumber);
-    if (myfield1 && myfield1[0]) {
-        myfield1 = myfield1[0];
-        // set generated keys on empty fields
-        if (myfield1.value == "") {
-            myfield1.value = clientpubkey;
-            myfield2 = document.getElementsByName("private-key" + peernumber)[0];
-            myfield2.value = clientprivkey;
-            myfield2.parentNode.parentNode.style.display = 'table-row';                
-        } else {
-            // clientpubkey already set, ask user to overwrite
-            if (confirm('Are you sure you want to OVERWRITE and generate NEW keys?')) {
-                var msgconfirm = "ok"
-                myfield1.value = clientpubkey;
-                myfield2 = document.getElementsByName("private-key" + peernumber)[0];
-                myfield2.value = clientprivkey;
-                myfield2.parentNode.parentNode.style.display = 'table-row';                
-            } else {
-                writeqrbox.parentElement.parentElement.style.display = "none"
-                return;
-            }
-        }
-    }
     var myfield2 = document.getElementsByName("preshared-key" + peernumber);
+    var presharedkey = myfield2[0].value;
+    var persistentkeepalive = document.getElementsByName('persistent-keepalive' + peernumber)[0].value;
+    var address = "";
     if (myfield2 && myfield2[0]) {
         myfield2 = myfield2[0];
-        // set generated keys on empty fields - else overwrite if user confirmed or keep existing values
-        if (myfield2.value == "") {
-            myfield2.value = presharedkey;
-        } else {
-            if (msgconfirm == "ok") {
-                myfield2.value = presharedkey
-            } else {
-                presharedkey = myfield2.value;
-            }
-        }
-        persistentkeepalive = document.getElementsByName('persistent-keepalive' + peernumber)[0].value;
         while (myfield2) {
             myfield2 = myfield2.parentNode;
             if (myfield2.tagName.toLowerCase() === 'div' && myfield2.className.toLowerCase() === 'multi') {
@@ -372,7 +337,65 @@ async function toggleQRclientconf() {
     console.log("Peer PersistentKeepalive: " + persistentkeepalive);
     console.log("Peer AllowedIPs: " + peersallowedips);
     console.log("Generated configuration for client:\n" + config);
+    return config;
+}
+
+function downloadConf() {
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(setConfig()));
+    element.setAttribute('download', 'wireguard-client-config.conf');
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+}
+
+async function toggleQRclientconf() {
+    var keypair = window.wireguard.generateKeypair();
+    var clientprivkey = keypair["privateKey"];
+    var clientpubkey = keypair["publicKey"];
+    var presharedkey = window.wireguard.generateKeypair()["privateKey"];
+    var myfield1 = document.getElementsByName("public-key" + peernumber);
+    var myfield2;
+    if (myfield1 && myfield1[0]) {
+        myfield1 = myfield1[0];
+        // set generated keys on empty fields
+        if (myfield1.value == "") {
+            myfield1.value = clientpubkey;
+            myfield2 = document.getElementsByName("private-key" + peernumber)[0];
+            myfield2.value = clientprivkey;
+            myfield2.parentNode.parentNode.style.display = 'table-row';                
+        } else {
+            // clientpubkey already set, ask user to overwrite
+            if (confirm('Are you sure you want to OVERWRITE and generate NEW keys?')) {
+                var msgconfirm = "ok"
+                myfield1.value = clientpubkey;
+                myfield2 = document.getElementsByName("private-key" + peernumber)[0];
+                myfield2.value = clientprivkey;
+                myfield2.parentNode.parentNode.style.display = 'table-row';                
+            } else {
+                writeqrbox.parentElement.parentElement.style.display = "none"
+                return;
+            }
+        }
+    }
+    myfield2 = document.getElementsByName("preshared-key" + peernumber);
+    if (myfield2 && myfield2[0]) {
+        myfield2 = myfield2[0];
+        // set generated keys on empty fields - else overwrite if user confirmed or keep existing values
+        if (myfield2.value == "") {
+            myfield2.value = presharedkey;
+        } else {
+            if (msgconfirm == "ok") {
+                myfield2.value = presharedkey
+            }
+        }
+    }
     // if correctLevel:QRCode.CorrectLevel.H (=default) is set, then Error: code length overflow. (1564>1056)
+    config = setConfig();
     new QRCode(writeqrbox, {text:config,correctLevel:QRCode.CorrectLevel.M});
     // short wait for generating code
     await new Promise(r => setTimeout(r, 1));
