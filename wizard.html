@@ -182,7 +182,7 @@ td#allowedips {
                                     </div>
                                 </div>
                                 <div class="addable-container"></div>
-                                <button type="button" class="addable-add" onclick="prepareToggleQRClientConf(this)">Generate config</button>
+                                <button type="button" class="addable-add" onclick="setTimeout(toggleQRclientconf,1,this)">Generate config</button>
                             </div>
                         </td>
                     </tr><tr>
@@ -227,9 +227,6 @@ function toggleQRpubkey() {
         qrcodebox.style.display = "none";
     }
 }
-var clickedElement;
-var peernumber = "";
-var writeqrbox = "";
 
 /*
 // listen for click events
@@ -283,12 +280,12 @@ function getPeer(element, level) {
             peernumber = node.name.replace(/[^0-9]/g, '');
             writeqrbox = myfield.querySelector('[name^="qrcodeclientconf"]');
             //console.log("peernumber " + peernumber);
-            return;
+            return [peernumber, writeqrbox];
         }
     }
 }
 
-function setConfig() {
+function setConfig(peernumber) {
     var clientprivkey = document.getElementsByName("private-key" + peernumber)[0].value;
     var clientpubkey = document.getElementsByName("public-key" + peernumber)[0].value;
     var serverpubkey = document.getElementById('localpubkey').value;
@@ -363,9 +360,9 @@ function setConfig() {
 }
 
 function downloadConf(buttonElement) {
-    getPeer(buttonElement,2);
+    const [peernumber, writeqrbox] = getPeer(buttonElement,2);
     var element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(setConfig()));
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(setConfig(peernumber)));
     element.setAttribute('download', 'wireguard-client-config.conf');
 
     element.style.display = 'none';
@@ -376,13 +373,8 @@ function downloadConf(buttonElement) {
     document.body.removeChild(element);
 }
 
-function prepareToggleQRClientConf(buttonElement) {
-    clickedElement = buttonElement;
-    setTimeout(toggleQRclientconf,1);
-}
-
-async function toggleQRclientconf() {
-    getPeer(clickedElement,1);
+async function toggleQRclientconf(buttonElement) {
+    const [peernumber, writeqrbox] = getPeer(buttonElement,1);
     var keypair = window.wireguard.generateKeypair();
     var clientprivkey = keypair["privateKey"];
     var clientpubkey = keypair["publicKey"];
@@ -424,7 +416,7 @@ async function toggleQRclientconf() {
         }
     }
     // if correctLevel:QRCode.CorrectLevel.H (=default) is set, then Error: code length overflow. (1564>1056)
-    config = setConfig();
+    config = setConfig(peernumber);
     new QRCode(writeqrbox, {text:config,correctLevel:QRCode.CorrectLevel.M});
     // short wait for generating code
     await new Promise(r => setTimeout(r, 1));
@@ -433,6 +425,7 @@ async function toggleQRclientconf() {
     generatedimg = box.getElementsByTagName("img")[0].src;
     writeqrbox.src = generatedimg;
 }
+
 document.onchange=function() {
     // set colored text on package and wizard status
     var pkgstatus = document.getElementById('pkgstatus')
