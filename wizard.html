@@ -178,11 +178,11 @@ td#allowedips {
                                     <div class="multi">
                                         <input disabled value="" type="image" src="" id="qrcodeclientconf" width="0" height="0" name="qrcodeclientconf" title="Client configuration QR code" ></input>
                                         <!-- <button type="button" class="addable-remove"></button> -->
-                                        <br><button class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" type="button" role="button" aria-disabled="false" onclick="downloadConf()"><span class="ui-button-text">Download client configuration</span></button>
+                                        <br><button class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" type="button" role="button" aria-disabled="false" onclick="downloadConf(this)"><span class="ui-button-text">Download client configuration</span></button>
                                     </div>
                                 </div>
                                 <div class="addable-container"></div>
-                                <button type="button" class="addable-add" onclick="setTimeout(toggleQRclientconf,1)">Generate config</button>
+                                <button type="button" class="addable-add" onclick="prepareToggleQRClientConf(this)">Generate config</button>
                             </div>
                         </td>
                     </tr><tr>
@@ -227,8 +227,11 @@ function toggleQRpubkey() {
         qrcodebox.style.display = "none";
     }
 }
+var clickedElement;
 var peernumber = "";
 var writeqrbox = "";
+
+/*
 // listen for click events
 $(document).click(function(event) {
     startelement = $(event.target).context;
@@ -264,6 +267,25 @@ function getNearestTableAncestor(htmlElementNode) {
         }
     }
     return undefined;
+}
+*/
+
+function getPeer(element, level) {
+    var myfield = element;
+    var currentlevel = 0;
+    while (myfield) {
+        myfield = myfield.parentNode;
+        if (myfield.tagName.toLowerCase() === 'div' && myfield.className.toLowerCase() === 'multi') {
+            currentlevel++;
+        }
+        if (currentlevel >= level) {
+            node = myfield.querySelector('[name^="description"]');            
+            peernumber = node.name.replace(/[^0-9]/g, '');
+            writeqrbox = myfield.querySelector('[name^="qrcodeclientconf"]');
+            //console.log("peernumber " + peernumber);
+            return;
+        }
+    }
 }
 
 function setConfig() {
@@ -340,7 +362,8 @@ function setConfig() {
     return config;
 }
 
-function downloadConf() {
+function downloadConf(buttonElement) {
+    getPeer(buttonElement,2);
     var element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(setConfig()));
     element.setAttribute('download', 'wireguard-client-config.conf');
@@ -353,7 +376,13 @@ function downloadConf() {
     document.body.removeChild(element);
 }
 
+function prepareToggleQRClientConf(buttonElement) {
+    clickedElement = buttonElement;
+    setTimeout(toggleQRclientconf,1);
+}
+
 async function toggleQRclientconf() {
+    getPeer(clickedElement,1);
     var keypair = window.wireguard.generateKeypair();
     var clientprivkey = keypair["privateKey"];
     var clientpubkey = keypair["publicKey"];
