@@ -185,24 +185,24 @@ installwireguard () {
         eval "interfaces=($($cli listActiveNodes $wgcfg))"
         $cmd begin
         for interface in "${interfaces[@]}"; do
-            $cmd delete $wgcfg "$interface" route-allowed-ips
             $cmd set $wgcfg "$interface" route-allowed-ips false
+            $cmd commit
         done
-        $cmd commit
         $cmd delete $wgcfg
         $cmd commit
         rmmod wireguard
         dpkg -i ${pkgvariant}*.deb
         modprobe wireguard
         # The loaded configuration becomes the working configuration and must be committed before it becomes the active configuration.
+        # config file is saved
         $cmd load
         $cmd commit
         # No need to save, config is restored from file (load) then commited to active config.
         $cmd end
     else
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..."
-        # if we have the previous config from wireguard on config.boot then:
-        # TODO: test this
+        # if we have the previous config from wireguard on config.boot (currently loaded config) then:
+        # TODO(tekert): test this
         eval "interfaces=($($cli listActiveNodes $wgcfg))"
         if [ "${interfaces[0]}" == "wg0" ]; then
             $cmd begin
@@ -506,6 +506,7 @@ apply () {
         name[${pubkey,,}]=1
     done
 
+    # We delete the node before a set to force it and not get a "The specified configuration node already exists" message on commit.
     if [ $ret == 0 ]; then
         temp=$(mktemp)
         (
