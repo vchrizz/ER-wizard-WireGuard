@@ -183,6 +183,7 @@ installwireguard () {
     if [ $? == 0 ]; then
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Upgrading WireGuard for $pkgvariant ..."
         eval "interfaces=($($cli listActiveNodes $wgcfg))"
+        $cmd begin
         for interface in "${interfaces[@]}"; do
             $cmd delete $wgcfg "$interface" route-allowed-ips
             $cmd set $wgcfg "$interface" route-allowed-ips false
@@ -193,6 +194,7 @@ installwireguard () {
         rmmod wireguard
         dpkg -i ${pkgvariant}*.deb
         modprobe wireguard
+        # The loaded configuration becomes the working configuration and must be committed before it becomes the active configuration.
         $cmd load
         $cmd commit
         # No need to save, config is restored from file (load) then commited to active config.
@@ -203,6 +205,7 @@ installwireguard () {
         # TODO: test this
         eval "interfaces=($($cli listActiveNodes $wgcfg))"
         if [ "${interfaces[0]}" == "wg0" ]; then
+            $cmd begin
             $cmd delete $wgcfg
             $cmd commit
             dpkg -i ${pkgvariant}*.deb
