@@ -506,7 +506,6 @@ apply () {
         name[${pubkey,,}]=1
     done
 
-    # We delete the node before a set to force it and not get a "The specified configuration node already exists" message on commit.
     if [ $ret == 0 ]; then
         temp=$(mktemp)
         (
@@ -526,33 +525,28 @@ apply () {
                 interfaces="wg0"
                 $cmd delete $wgcfg ${interfaces[0]} disable
 
-                $cmd delete $wgcfg ${interfaces[0]} private-key
                 if ! $cmd set $wgcfg ${interfaces[0]} private-key "${privatekey}"; then
                     echo "set $wgcfg ${interfaces[0]} private-key \"${privatekey}\" failed." >> $log
                     ret=1
                 fi
                 if [ -n "$listenport" ]; then
-                    $cmd delete $wgcfg ${interfaces[0]} listen-port
                     if ! $cmd set $wgcfg ${interfaces[0]} listen-port "${listenport}"; then
                         echo "set $wgcfg ${interfaces[0]} listen-port \"${listenport}\" failed." >> $log
                         ret=1
                     fi
                 fi
                 if [ "$routeallowedips" == "on" ]; then
-                    $cmd delete $wgcfg ${interfaces[0]} route-allowed-ips
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips true; then
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips true failed." >> $log
                         ret=1
                     fi
                 else
-                    $cmd delete $wgcfg ${interfaces[0]} route-allowed-ips
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips false; then
                         echo "set $wgcfg ${interfaces[0]} route-allowed-ips false failed." >> $log
                         ret=1
                     fi
                 fi
                 if [ -n "$ipaddress" ]; then
-                    $cmd delete $wgcfg ${interfaces[0]} address
                     if ! $cmd set $wgcfg ${interfaces[0]} address $ipaddress; then
                         echo "set $wgcfg ${interfaces[0]} address $ipaddress failed." >> $log
                     fi
@@ -563,7 +557,6 @@ apply () {
                         continue
                     fi
                     if [ -n "${descriptions[i]}" ]; then
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description "${descriptions[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" description \"${descriptions[i]}\" failed." >> $log
                             ret=1
@@ -571,7 +564,6 @@ apply () {
                         fi
                     fi
                     if [ -n "${endpoints[i]}" ]; then
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint "${endpoints[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" endpoint \"${endpoints[i]}\" failed." >> $log
                             ret=1
@@ -579,7 +571,6 @@ apply () {
                         fi
                     fi
                     if [ -n "${persistentkeepalives[i]}" ]; then
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive "${persistentkeepalives[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" persistent-keepalive \"${persistentkeepalives[i]}\" failed." >> $log
                             ret=1
@@ -587,7 +578,6 @@ apply () {
                         fi
                     fi
                     if [ -n "${presharedkeys[i]}" ]; then
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key "${presharedkeys[i]}"; then
                             echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" preshared-key \"${presharedkeys[i]}\" failed." >> $log
                             ret=1
@@ -595,7 +585,6 @@ apply () {
                         fi
                     fi
                     if [ -n "${allowedips[j]}" ] && [ "${allowedips[j]}" != "null" ]; then
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips
                         for allowedip in ${allowedips[j]}; do
                             if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips "$allowedip"; then
                                 echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" allowed-ips \"$allowedip\" failed." >> $log
