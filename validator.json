@@ -4,6 +4,12 @@
       "required": false,
       "number":1
     },
+    "ipaddress": {
+      "required": false
+    },
+    "description": {
+      "required": false
+    },
     "endpoint": {
       "required": false
     },
@@ -18,6 +24,12 @@
       "number":1
     },
     "allowed-ips": {
+      "required": false
+    },
+    "peers-dns": {
+      "required": false
+    },
+    "peers-allowed-ips": {
       "required": false
     }
   }
