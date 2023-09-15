@@ -12,7 +12,7 @@
 
 wgdir="/config/user-data/wireguard/"
 wgsettings="${wgdir}wgsettings.json"
-wgsetupscriptfile="/config/scripts/pre-config.d/wireguard_setup.sh"
+wgsetupscriptfile="/config/scripts/post-config.d/wireguard_setup.sh"
 wgautoupdatecronjob="/etc/cron.daily/wireguard_autoupdate"
 log="${wgdir}wireguard-wizard.log"
 wgpkgapi="https://api.github.com/repos/WireGuard/wireguard-vyatta-ubnt/releases/latest"
@@ -31,9 +31,10 @@ wgcfg="interfaces wireguard"
 cmd=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
 run=/opt/vyatta/bin/vyatta-op-cmd-wrapper
 cli=cli-shell-api
+# Viatta cli DOC in: https://vyos.dev/w/development/cli-shell-api/
 
-# if wizard log is greater than 1M then overwrite with new content
-if [ $(wc -c <$log) -ge 1048576 ]; then
+# if wizard log is greater than 256KB then overwrite with new content
+if [ $(wc -c <$log) -ge 262144 ]; then
     echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >$log
 else
     echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [wizard] EdgeMAX WireGuard Wizard started - Session="$$ >>$log
@@ -57,6 +58,12 @@ done
 if [ ! -f $wireguardwizard ]; then
     echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Error: WireGuard wizard not found! Exit." >>$log
     exit 1
+fi
+# Check if already installed, do nothing:
+dpkg -l wireguard >>$log 2>>$log
+if [ $? == 0 ]; then
+    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] wireguard package already installed! Exit" >>$log
+    exit 0
 fi
 echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [setup] Running install function from wizard ... " >>$log
 $wireguardwizard install >>$log
@@ -84,7 +91,7 @@ if [ ! -f $wireguardwizard ]; then
     exit 1
 else
     onlinecheck="false"
-    curl -s --connect-timeout 3 https://api.github.com >/dev/null
+    curl -s --retry 12 --retry-max-time 60 --retry-connrefused --connect-timeout 3 https://api.github.com >/dev/null
     if [ $? == 0 ]; then
         onlinecheck="true"
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [autoupdate] online-check succeeded ..."
@@ -126,7 +133,7 @@ installwireguard () {
     cd $wgdir
     echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] check if we are online (if we can reach github.com) ..."
     onlinecheck="false"
-    curl -s --connect-timeout 3 https://api.github.com >/dev/null
+    curl -s --retry 12 --retry-max-time 60 --retry-connrefused --connect-timeout 3 https://api.github.com >/dev/null
     if [ $? == 0 ]; then
         onlinecheck="true"
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] online-check succeeded ..."
@@ -155,7 +162,7 @@ installwireguard () {
             rm -f ${wgdir}/ER-wizard-WireGuard.tar
         fi
     fi
-    if [ ! -f ${pkgvariant}*.deb ]; then
+    if [ ! -f "$wgpackage" ]; then
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file not found, need to download from latest release ..."
         if [ "$onlinecheck" == "true" ]; then
             curl -sLo /tmp/wgpkglatest ${wgpkgapi}
@@ -170,34 +177,76 @@ installwireguard () {
     else
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file $pkgvariant found in $(pwd) ..."
     fi
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..."
-    dpkg -i ${pkgvariant}*.deb
-    if [ ! -f ER-wizard-WireGuard.tar ]; then
-        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file not found, need to download from latest release ..."
-        if [ "$onlinecheck" == "true" ]; then
-            curl -sLo /tmp/wgwizlatest ${wgwizapi}
-            wizurl=$(jq -r '.assets[].browser_download_url' /tmp/wgwizlatest)
-            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of Wizard starting from $wizurl ..."
-            curl -sLO $wizurl
-            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
-        else
-            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Error: we are not online, can not download. Missing tar-file. Exit."
-            exit 1
-        fi
-    else
-        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file found in $(pwd) - installing WireGuard Wizard..."
-        wireguardwizard=""
-        for i in $(find /config/wizard/feature/ -name wizard-run); do
-            if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
-                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard wizard found in $i" >>$log
-                wireguardwizard=$i
-                break
-            fi
+    # Check if already installed do https://github.com/WireGuard/wireguard-vyatta-ubnt/wiki/EdgeOS-and-Unifi-Gateway#upgrade
+    # else install reusing last config or install normally if no config (no need for restart):
+    dpkg -l wireguard
+    if [ $? == 0 ]; then
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Upgrading WireGuard for $pkgvariant ..."
+        eval "interfaces=($($cli listActiveNodes $wgcfg))"
+        $cmd begin
+        for interface in "${interfaces[@]}"; do
+            $cmd set $wgcfg "$interface" route-allowed-ips false
+            $cmd commit
         done
+        $cmd delete $wgcfg
+        $cmd commit
+        rmmod wireguard
+        dpkg -i ${pkgvariant}*.deb
+        modprobe wireguard
+        # The loaded configuration becomes the working configuration and must be committed before it becomes the active configuration.
+        # config file is saved
+        $cmd load
+        $cmd commit
+        # No need to save, config is restored from file (load) then commited to active config.
+        $cmd end
+    else
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard for $pkgvariant ..."
+        # if we have the previous config from wireguard on config.boot (currently loaded config) then:
+        # TODO(tekert): test this
+        eval "interfaces=($($cli listActiveNodes $wgcfg))"
+        if [ "${interfaces[0]}" == "wg0" ]; then
+            $cmd begin
+            $cmd delete $wgcfg
+            $cmd commit
+            dpkg -i ${pkgvariant}*.deb
+            modprobe wireguard
+            $cmd load
+            $cmd commit
+            $cmd end
+        else
+            dpkg -i ${pkgvariant}*.deb
+            modprobe wireguard
+        fi
     fi
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard wizard ..."
-    tar -C $(dirname $wireguardwizard) -xf ER-wizard-WireGuard.tar
-    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard and Wizard installation done."
+    # Security alert, only update if the user checked auto update or checked the box to manually do a forced update on Apply button.
+    if [ "$1" == "forceupgrade" ] || [ -w $wgautoupdatecronjob ]; then
+        if [ ! -f ER-wizard-WireGuard.tar ]; then
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file not found, need to download from latest release ..."
+            if [ "$onlinecheck" == "true" ]; then
+                curl -sLo /tmp/wgwizlatest ${wgwizapi}
+                wizurl=$(jq -r '.assets[].browser_download_url' /tmp/wgwizlatest)
+                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of Wizard starting from $wizurl ..."
+                curl -sLO $wizurl
+                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
+            else
+                echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Error: we are not online, can not download. Missing tar-file. Exit."
+                exit 1
+            fi
+        else
+            echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard Wizard tar-file found in $(pwd) - installing WireGuard Wizard..."
+            wireguardwizard=""
+            for i in $(find /config/wizard/feature/ -name wizard-run); do
+                if [ "$(head $i -n 10 | grep -i 'wireguard')" ]; then
+                    echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard wizard found in $i" >>$log
+                    wireguardwizard=$i
+                    break
+                fi
+            done
+        fi
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Installing WireGuard wizard ..."
+        tar -C $(dirname $wireguardwizard) -xf ER-wizard-WireGuard.tar
+        echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard and Wizard installation done."
+    fi
 }
 
 # function called when you click the wizard
@@ -289,7 +338,13 @@ load () {
     # Checkbox "Enable"
     wgenable="\"wgenable\":false"
     eval "interfaces=($($cli listActiveNodes $wgcfg))"
-    if [ "${interfaces[0]}" == "wg0" ]; then wgenable="\"wgenable\":\"on\""; fi
+    if [ "${interfaces[0]}" == "wg0" ]; then
+        # existsActive: Returns 0 if specified node exists in the current active (running) configuration, 1 otherwise.
+        $cli existsActive $wgcfg ${interfaces[0]} disable
+        if [ $? == 1 ]; then
+            wgenable="\"wgenable\":\"on\"";
+        fi
+    fi
 
     # Inputfield "Server Port"
     eval "listenport=($($cli returnActiveValue $wgcfg ${interfaces[0]} listen-port))"
@@ -318,8 +373,14 @@ load () {
     fi
     localpubkey="\"localpubkey\":\"$localpubkey\""
 
+    # privatekeycfg can be a file path or key / privatekey always has a key
+    eval "privatekeycfg=($($cli returnActiveValue $wgcfg ${interfaces[0]} private-key))"
+    if [ -z "$privatekeycfg" ]; then
+        echo "[INFO] privatekeycfg=($($cli returnActiveValue $wgcfg ${interfaces[0]} private-key)) is empty!." >> $log
+    fi
+
     # (hidden) Inputfield "private key"
-    privatekey="\"privatekey\":\"$privatekey\""
+    privatekey="\"privatekey\":\"$privatekeycfg\""
 
     # Inputfield allowed ips for peers QR code
     eval "peersallowedips=($($run show configuration commands | awk '/wireguard-wizard-peers-allowed-ips/ {print $5}'))"
@@ -484,15 +545,19 @@ apply () {
                 fi
             fi            
             eval "interfaces=($($cli listActiveNodes $wgcfg))"
-            if [ -n "$interfaces" ]; then
-                #$cmd delete $wgcfg ${interfaces[0]} || ret=1
-                if ! $cmd delete $wgcfg ${interfaces[0]}; then
-                    echo "$cmd delete $wgcfg ${interfaces[0]} failed." >> $log
-                    ret=1
+            if [ ! "$wgenable" == "on" ]; then
+                if [ -n "$interfaces" ]; then
+                    $cmd delete $wgcfg ${interfaces[0]} disable
+                    if ! $cmd set $wgcfg ${interfaces[0]} disable; then
+                        echo "set $wgcfg ${interfaces[0]} disable failed." >> $log
+                        ret=1
+                    fi
                 fi
             fi
             if [ "$wgenable" == "on" ]; then
                 interfaces="wg0"
+                $cmd delete $wgcfg ${interfaces[0]} disable
+
                 if ! $cmd set $wgcfg ${interfaces[0]} private-key "${privatekey}"; then
                     echo "set $wgcfg ${interfaces[0]} private-key \"${privatekey}\" failed." >> $log
                     ret=1
