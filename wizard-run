@@ -567,6 +567,8 @@ apply () {
                         echo "set $wgcfg ${interfaces[0]} listen-port \"${listenport}\" failed." >> $log
                         ret=1
                     fi
+                else
+                    $cmd delete $wgcfg ${interfaces[0]} listen-port
                 fi
                 if [ "$routeallowedips" == "on" ]; then
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips true; then
@@ -587,6 +589,8 @@ apply () {
                             break 2
                         fi
                     done
+                else
+                     $cmd delete $wgcfg ${interfaces[0]} address
                 fi
                 if [ -n "$peersallowedips" ]; then
                     if ! $cmd set custom-attribute wireguard-wizard-peers-allowed-ips; then
