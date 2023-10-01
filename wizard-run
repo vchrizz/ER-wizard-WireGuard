@@ -658,6 +658,7 @@ apply () {
                         $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key
                     fi
                     if [ -n "${allowedips[j]}" ] && [ "${allowedips[j]}" != "null" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips
                         for allowedip in ${allowedips[j]}; do
                             if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips "$allowedip"; then
                                 echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" allowed-ips \"$allowedip\" failed." >> $log
@@ -665,8 +666,6 @@ apply () {
                                 break 2
                             fi
                         done
-                    else
-                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips
                     fi
                     if [ $ret == 1 ]; then
                         echo "something failed, check log!" >> $log
