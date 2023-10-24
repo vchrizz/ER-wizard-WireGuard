@@ -166,7 +166,7 @@ installwireguard () {
         echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] WireGuard deb-file not found, need to download from latest release ..."
         if [ "$onlinecheck" == "true" ]; then
             curl -sLo /tmp/wgpkglatest ${wgpkgapi}
-            pkgurl=$(jq -r '.assets[].browser_download_url | select(test("'$pkgvariant'"))' /tmp/wgpkglatest)
+            pkgurl=$(jq -r '.assets[].browser_download_url | select(contains("'$pkgvariant'"))' /tmp/wgpkglatest)
             echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] Download of WireGuard starting from $pkgurl ..."
             curl -sLO $pkgurl
             echo "$(date +%Y-%m-%d/%H:%M:%S.%N) [installer] download done."
