@@ -395,7 +395,7 @@ load () {
     # Inputfield endpoint for peers QR code
     eval "peersendpoint=($($run show configuration commands | awk '/wireguard-wizard-peers-endpoint/ {print $5}'))"
     peersendpoint="\"peers-endpoint\":\"$peersendpoint\""
-    
+
     # Peers:
     # get current wireguard configuration and return configured values to wizard.html
     peerlist=''
@@ -537,13 +537,13 @@ apply () {
                     echo "$cmd delete custom-attribute wireguard-wizard-peers-allowed-ips failed." >> $log
                     ret=1
                 fi
-            fi            
+            fi
             if $cmd show | grep -q "wireguard-wizard-peers-dns"; then
                 if ! $cmd delete custom-attribute wireguard-wizard-peers-dns; then
                     echo "$cmd delete custom-attribute wireguard-wizard-peers-dns failed." >> $log
                     ret=1
                 fi
-            fi            
+            fi
             eval "interfaces=($($cli listActiveNodes $wgcfg))"
             if [ ! "$wgenable" == "on" ]; then
                 if [ -n "$interfaces" ]; then
@@ -567,6 +567,8 @@ apply () {
                         echo "set $wgcfg ${interfaces[0]} listen-port \"${listenport}\" failed." >> $log
                         ret=1
                     fi
+                else
+                    $cmd delete $wgcfg ${interfaces[0]} listen-port
                 fi
                 if [ "$routeallowedips" == "on" ]; then
                     if ! $cmd set $wgcfg ${interfaces[0]} route-allowed-ips true; then
@@ -587,6 +589,8 @@ apply () {
                             break 2
                         fi
                     done
+                else
+                     $cmd delete $wgcfg ${interfaces[0]} address
                 fi
                 if [ -n "$peersallowedips" ]; then
                     if ! $cmd set custom-attribute wireguard-wizard-peers-allowed-ips; then
@@ -623,6 +627,8 @@ apply () {
                             ret=1
                             break
                         fi
+                    else
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" description
                     fi
                     if [ -n "${endpoints[i]}" ]; then
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint "${endpoints[i]}"; then
@@ -630,6 +636,8 @@ apply () {
                             ret=1
                             break
                         fi
+                    else
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" endpoint
                     fi
                     if [ -n "${persistentkeepalives[i]}" ]; then
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive "${persistentkeepalives[i]}"; then
@@ -637,6 +645,8 @@ apply () {
                             ret=1
                             break
                         fi
+                    else
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" persistent-keepalive
                     fi
                     if [ -n "${presharedkeys[i]}" ]; then
                         if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key "${presharedkeys[i]}"; then
@@ -644,8 +654,11 @@ apply () {
                             ret=1
                             break
                         fi
+                    else
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" preshared-key
                     fi
                     if [ -n "${allowedips[j]}" ] && [ "${allowedips[j]}" != "null" ]; then
+                        $cmd delete $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips
                         for allowedip in ${allowedips[j]}; do
                             if ! $cmd set $wgcfg ${interfaces[0]} peer "${pubkeys[i]}" allowed-ips "$allowedip"; then
                                 echo "set $wgcfg ${interfaces[0]} peer \"${pubkeys[i]}\" allowed-ips \"$allowedip\" failed." >> $log
