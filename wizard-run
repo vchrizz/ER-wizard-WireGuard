@@ -673,6 +673,25 @@ apply () {
                     fi
                     j=$(expr $j + 1)
                 done
+                
+                # delete old peers
+                eval "peers=($($cli listActiveNodes $wgcfg ${interfaces[0]} peer))"
+                for peer in "${peers[@]}"; do
+                    found=
+                    for pubkey in "${pubkeys[@]}"; do
+                        if [ $peer == $pubkey ]; then
+                            found=1
+                            break
+                        fi
+                    done
+                    if [ ! $found ]; then
+                        if ! $cmd delete $wgcfg ${interfaces[0]} peer "$peer"; then
+                            echo "delete $wgcfg ${interfaces[0]} peer \"$peer\" failed." >> $log
+                            ret=1
+                            break
+                        fi
+                    fi
+                done
             fi
 
             if [ $ret == 0 ]; then
