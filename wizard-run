@@ -511,9 +511,9 @@ apply () {
     parse pubkeys '."peerlist"[]|select(has("public-key"?))."public-key"?'
     parse descriptions '."peerlist"[]|select(has("public-key"?))."description"?'
     parse endpoints '."peerlist"[]|select(has("public-key"?))."endpoint"?'
-    parse presharedkeys '."peerlist"[]|select(has("public-key"?))."preshared-key"'
-    parse persistentkeepalives '."peerlist"[]|select(has("public-key"?))."persistent-keepalive"'
-    mapfile -t allowedips < <(cat $INPUT | jq -c '."peerlist"[]|select(has("public-key"?))."allowed-ips"' | sed 's/,/ /g;s/\[//;s/\]//;s/\"//g')
+    parse presharedkeys '."peerlist"[]|select(has("public-key"?))."preshared-key"?'
+    parse persistentkeepalives '."peerlist"[]|select(has("public-key"?))."persistent-keepalive"?'
+    mapfile -t allowedips < <(cat $INPUT | jq -c '."peerlist"[]|select(has("public-key"?))."allowed-ips"?' | sed 's/,/ /g;s/\[//;s/\]//;s/\"//g')
 
     for pubkey in "${pubkeys[@]}"; do
         if [ -z "$pubkey" ] || [ "$pubkey" == null ]; then
