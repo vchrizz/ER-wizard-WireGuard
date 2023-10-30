@@ -179,6 +179,7 @@ td#allowedips {
                                         <input disabled value="" type="image" src="" id="qrcodeclientconf" width="0" height="0" name="qrcodeclientconf" title="Client configuration QR code" ></input>
                                         <!-- <button type="button" class="addable-remove"></button> -->
                                         <br><button class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" type="button" role="button" aria-disabled="false" onclick="downloadConf(this)"><span class="ui-button-text">Download client configuration</span></button>
+                                        <button style="display:none" type="button" name="generate-config-remove" class="addable-remove">Remove config</button>
                                     </div>
                                 </div>
                                 <div class="addable-container"></div>
@@ -399,6 +400,10 @@ async function toggleQRclientconf(buttonElement) {
                 myfield2.parentNode.parentNode.style.display = 'table-row';                
             } else {
                 writeqrbox.parentElement.parentElement.style.display = "none"
+                // restore generage config button
+                buttonElement.parentNode.querySelector('[name^="generate-config-remove"]').click();
+                buttonElement.disabled = false;
+                buttonElement.classList.remove("ui-state-disabled");
                 return;
             }
         }
