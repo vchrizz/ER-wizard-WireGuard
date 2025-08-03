@@ -1,3 +1,6 @@
+# PROJECT DEAD!
+## because WireGuard is now supported as of EdgeOS 3.0.0: https://community.ui.com/releases/EdgeRouter-3-0-0/33ee3852-b5db-453e-ad14-430bc218c02f
+
 # ER-wizard-WireGuard
 WireGuard Wizard for Ubiquiti EdgeMAX Devices supporting Wizards
 
